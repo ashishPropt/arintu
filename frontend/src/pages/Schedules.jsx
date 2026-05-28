@@ -1,8 +1,35 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { schedules as schedulesApi, classes as classesApi } from '../api';
 import { useAuth } from '../contexts/AuthContext';
 import Modal from '../components/Modal';
 import { format, startOfWeek, addDays, isSameDay } from 'date-fns';
+
+/**
+ * Mirror of the backend generateOccurrences — used for the live preview.
+ */
+function countOccurrences(startTime, recurringType, repeatUntil) {
+  if (!startTime || recurringType === 'once' || !repeatUntil) return 1;
+  const start = new Date(startTime);
+  const until = new Date(repeatUntil);
+  if (isNaN(start) || isNaN(until) || until <= start) return 1;
+
+  function next(d) {
+    const n = new Date(d);
+    switch (recurringType) {
+      case 'daily':    n.setDate(n.getDate() + 1);   break;
+      case 'weekly':   n.setDate(n.getDate() + 7);   break;
+      case 'biweekly': n.setDate(n.getDate() + 14);  break;
+      case 'monthly':  n.setMonth(n.getMonth() + 1); break;
+      default: return null;
+    }
+    return n;
+  }
+
+  let count = 1;
+  let cursor = next(start);
+  while (cursor && cursor <= until && count < 365) { count++; cursor = next(cursor); }
+  return count;
+}
 
 export default function Schedules() {
   const { user } = useAuth();
@@ -128,28 +155,60 @@ function ScheduleCard({ schedule: s, isAdmin, onCreateZoom, onDeleted }) {
 function CreateScheduleModal({ classes, onClose, onCreated }) {
   const [form, setForm] = useState({
     classId: '', title: '', startTime: '', endTime: '',
-    recurringType: 'once', notes: '',
+    recurringType: 'once', repeatUntil: '', notes: '',
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
 
+  const isRecurring = form.recurringType !== 'once';
+
+  // Live session count
+  const sessionCount = useMemo(
+    () => countOccurrences(form.startTime, form.recurringType, form.repeatUntil),
+    [form.startTime, form.recurringType, form.repeatUntil]
+  );
+
+  // Min date for "Repeat until" = the day of the first session
+  const minRepeatUntil = form.startTime
+    ? form.startTime.split('T')[0]
+    : undefined;
+
   const submit = async (e) => {
     e.preventDefault();
     setLoading(true);
+    setError('');
     try {
-      await schedulesApi.create({ ...form, startTime: new Date(form.startTime).toISOString(), endTime: new Date(form.endTime).toISOString() });
+      const payload = {
+        classId:       form.classId,
+        title:         form.title,
+        startTime:     new Date(form.startTime).toISOString(),
+        endTime:       new Date(form.endTime).toISOString(),
+        recurringType: form.recurringType,
+        notes:         form.notes,
+        repeatUntil:   (isRecurring && form.repeatUntil)
+                         ? new Date(form.repeatUntil + 'T23:59:59').toISOString()
+                         : undefined,
+      };
+      await schedulesApi.create(payload);
       onCreated();
     } catch (err) {
-      setError(err.response?.data?.error || 'Failed');
+      setError(err.response?.data?.error || 'Failed to create schedule');
     } finally { setLoading(false); }
   };
 
+  const freqLabel = {
+    once: 'session', daily: 'daily sessions', weekly: 'weekly sessions',
+    biweekly: 'bi-weekly sessions', monthly: 'monthly sessions',
+  };
+
   return (
-    <Modal open title="Schedule a Session" onClose={onClose}>
+    <Modal open title="Schedule Sessions" onClose={onClose} size="lg">
       <form onSubmit={submit} className="space-y-4">
         {error && <div className="p-3 bg-red-50 text-red-600 rounded-lg text-sm">{error}</div>}
+
+        {/* Class */}
         <div>
           <label className="block text-xs font-medium text-gray-700 mb-1">Class *</label>
           <select className="input" value={form.classId} onChange={(e) => set('classId', e.target.value)} required>
@@ -157,37 +216,87 @@ function CreateScheduleModal({ classes, onClose, onCreated }) {
             {classes.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
           </select>
         </div>
+
+        {/* Title */}
         <div>
           <label className="block text-xs font-medium text-gray-700 mb-1">Session Title (optional)</label>
-          <input className="input" value={form.title} onChange={(e) => set('title', e.target.value)} />
+          <input className="input" placeholder="e.g. Chapter 3 Review" value={form.title} onChange={(e) => set('title', e.target.value)} />
         </div>
+
+        {/* Start / End times */}
         <div className="grid grid-cols-2 gap-3">
           <div>
-            <label className="block text-xs font-medium text-gray-700 mb-1">Start *</label>
-            <input type="datetime-local" className="input" value={form.startTime} onChange={(e) => set('startTime', e.target.value)} required />
+            <label className="block text-xs font-medium text-gray-700 mb-1">First session starts *</label>
+            <input type="datetime-local" className="input" value={form.startTime}
+              onChange={(e) => set('startTime', e.target.value)} required />
           </div>
           <div>
-            <label className="block text-xs font-medium text-gray-700 mb-1">End *</label>
-            <input type="datetime-local" className="input" value={form.endTime} onChange={(e) => set('endTime', e.target.value)} required />
+            <label className="block text-xs font-medium text-gray-700 mb-1">First session ends *</label>
+            <input type="datetime-local" className="input" value={form.endTime}
+              onChange={(e) => set('endTime', e.target.value)} required />
           </div>
         </div>
-        <div>
-          <label className="block text-xs font-medium text-gray-700 mb-1">Recurring</label>
-          <select className="input" value={form.recurringType} onChange={(e) => set('recurringType', e.target.value)}>
-            <option value="once">One-time</option>
-            <option value="weekly">Weekly</option>
-            <option value="biweekly">Bi-weekly</option>
-            <option value="daily">Daily</option>
-            <option value="monthly">Monthly</option>
-          </select>
+
+        {/* Frequency */}
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="block text-xs font-medium text-gray-700 mb-1">Frequency</label>
+            <select className="input" value={form.recurringType}
+              onChange={(e) => { set('recurringType', e.target.value); if (e.target.value === 'once') set('repeatUntil', ''); }}>
+              <option value="once">One-time only</option>
+              <option value="daily">Daily</option>
+              <option value="weekly">Weekly</option>
+              <option value="biweekly">Bi-weekly</option>
+              <option value="monthly">Monthly</option>
+            </select>
+          </div>
+
+          {/* Repeat Until — only shown for recurring */}
+          {isRecurring && (
+            <div>
+              <label className="block text-xs font-medium text-gray-700 mb-1">Repeat until *</label>
+              <input type="date" className="input" value={form.repeatUntil}
+                min={minRepeatUntil}
+                onChange={(e) => set('repeatUntil', e.target.value)}
+                required={isRecurring} />
+            </div>
+          )}
         </div>
+
+        {/* Live preview pill */}
+        {(form.startTime && form.endTime) && (
+          <div className={`flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm font-medium ${
+            sessionCount > 1 ? 'bg-brand-50 text-brand-700 border border-brand-100' : 'bg-gray-50 text-gray-600 border border-gray-100'
+          }`}>
+            <span className="text-lg">{sessionCount > 1 ? '📅' : '📆'}</span>
+            <span>
+              {sessionCount === 1
+                ? 'Creates 1 session'
+                : `Creates ${sessionCount} ${freqLabel[form.recurringType]}`}
+              {sessionCount > 1 && form.repeatUntil && (
+                <span className="font-normal text-brand-500">
+                  {' '}· ends {new Date(form.repeatUntil).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                </span>
+              )}
+            </span>
+          </div>
+        )}
+
+        {/* Notes */}
         <div>
           <label className="block text-xs font-medium text-gray-700 mb-1">Notes</label>
           <textarea className="input" rows={2} value={form.notes} onChange={(e) => set('notes', e.target.value)} />
         </div>
+
         <div className="flex justify-end gap-2 pt-1">
           <button type="button" onClick={onClose} className="btn-secondary">Cancel</button>
-          <button type="submit" disabled={loading} className="btn-primary">{loading ? 'Saving…' : 'Create Session'}</button>
+          <button type="submit" disabled={loading} className="btn-primary">
+            {loading
+              ? 'Creating…'
+              : sessionCount > 1
+                ? `Create ${sessionCount} sessions`
+                : 'Create session'}
+          </button>
         </div>
       </form>
     </Modal>
