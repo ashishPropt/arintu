@@ -5,6 +5,18 @@ const { createNotification, notifyClassMembers } = require('../services/notifica
 
 const router = express.Router();
 
+// ── Stripe (optional) ─────────────────────────────────────────────────────────
+// Set STRIPE_SECRET_KEY in .env to enable payment collection at application time.
+// Without it, applications are accepted and flagged as 'stripe_pending' so admins
+// can still process them manually until Stripe is configured.
+function getStripe() {
+  const key = process.env.STRIPE_SECRET_KEY;
+  if (!key || key === 'sk_test_YOUR_STRIPE_SECRET_KEY_HERE') return null;
+  try { return require('stripe')(key, { apiVersion: '2024-06-20' }); }
+  catch { return null; }
+}
+// ─────────────────────────────────────────────────────────────────────────────
+
 // POST /api/applications  — student submits an application
 router.post('/', authenticate, authorize('student'), async (req, res) => {
   const { classId, countryCode, scholarshipRequested, scholarshipType } = req.body;
@@ -27,9 +39,11 @@ router.post('/', authenticate, authorize('student'), async (req, res) => {
     const cls = await db.query('SELECT * FROM classes WHERE id = $1 AND is_active = TRUE', [classId]);
     if (!cls.rows[0]) return res.status(404).json({ error: 'Class not found' });
 
-    // Check not already applied or enrolled
+    // Check not already applied or enrolled (ignore abandoned failed/pending_payment records)
     const existing = await db.query(
-      'SELECT id, status FROM class_applications WHERE class_id = $1 AND student_id = $2',
+      `SELECT id, status, payment_status FROM class_applications
+       WHERE class_id = $1 AND student_id = $2
+         AND (payment_status IS NULL OR payment_status NOT IN ('failed', 'pending_payment'))`,
       [classId, studentId]
     );
     if (existing.rows[0]) {
@@ -86,28 +100,91 @@ router.post('/', authenticate, authorize('student'), async (req, res) => {
 
     // Insert application
     const scholType = scholarshipRequested ? (scholarshipType || 'partial') : 'none';
+
+    // Determine initial payment_status
+    const initialPaymentStatus = feeWaived ? 'waived' : 'pending_payment';
+
     const result = await db.query(
       `INSERT INTO class_applications
          (class_id, student_id, country_id, application_fee_charged, currency_code, fee_waived,
-          scholarship_requested, scholarship_type)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+          scholarship_requested, scholarship_type, payment_status)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
        RETURNING *`,
       [classId, studentId, countryId, feeWaived ? 0 : feeAmount, currencyCode, feeWaived,
-       scholarshipRequested || false, scholType]
+       scholarshipRequested || false, scholType, initialPaymentStatus]
     );
+    const applicationId = result.rows[0].id;
 
-    // Notify admin(s) who own the class
-    const admin = await db.query('SELECT admin_id FROM classes WHERE id = $1', [classId]);
-    const student = await db.query('SELECT name FROM users WHERE id = $1', [studentId]);
+    // ── Payment collection via Stripe ─────────────────────────────────────────
+    let checkoutUrl = null;
+    let stripeSessionId = null;
+    let stripeNotConfigured = false;
 
-    if (admin.rows[0]) {
-      await createNotification({
-        userId: admin.rows[0].admin_id,
-        title: `New application: ${cls.rows[0].name}`,
-        message: `${student.rows[0]?.name} has applied to join "${cls.rows[0].name}".`,
-        type: 'class',
-        metadata: { applicationId: result.rows[0].id, classId },
-      });
+    if (!feeWaived) {
+      const stripe = getStripe();
+
+      if (stripe) {
+        // Stripe is configured — create a Checkout session
+        const student = await db.query('SELECT name, email FROM users WHERE id = $1', [studentId]);
+        const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+
+        // Only a subset of currencies are natively supported by Stripe — default to USD if unsupported
+        const STRIPE_CURRENCIES = ['usd', 'eur', 'gbp', 'cad', 'aud', 'sgd', 'inr', 'mxn'];
+        const chargeCurrency = STRIPE_CURRENCIES.includes(currencyCode.toLowerCase())
+          ? currencyCode.toLowerCase()
+          : 'usd';
+
+        const session = await stripe.checkout.sessions.create({
+          mode: 'payment',
+          customer_email: student.rows[0].email,
+          line_items: [{
+            price_data: {
+              currency: chargeCurrency,
+              product_data: {
+                name: `Application Fee — ${cls.rows[0].name}`,
+                description: 'One-time application fee for Arintu. Waived on all future class applications.',
+              },
+              unit_amount: Math.round(feeAmount * 100), // Stripe uses smallest currency unit (cents)
+            },
+            quantity: 1,
+          }],
+          metadata: { applicationId, studentId, classId },
+          success_url: `${frontendUrl}/payment/success?session_id={CHECKOUT_SESSION_ID}`,
+          cancel_url:  `${frontendUrl}/payment/cancel?app_id=${applicationId}`,
+        });
+
+        // Save session ID so the webhook and verify endpoint can find the application
+        await db.query(
+          'UPDATE class_applications SET stripe_session_id = $1 WHERE id = $2',
+          [session.id, applicationId]
+        );
+
+        checkoutUrl = session.url;
+        stripeSessionId = session.id;
+      } else {
+        // Stripe not yet configured — mark as stripe_pending so admins can still see it
+        await db.query(
+          "UPDATE class_applications SET payment_status = 'stripe_pending' WHERE id = $1",
+          [applicationId]
+        );
+        stripeNotConfigured = true;
+      }
+    }
+
+    // ── Notify admin for fee-waived or placeholder-mode applications ──────────
+    // (For Stripe-paid apps the webhook/verify triggers the notification on payment confirmation)
+    if (feeWaived || stripeNotConfigured) {
+      const admin = await db.query('SELECT admin_id FROM classes WHERE id = $1', [classId]);
+      const student = await db.query('SELECT name FROM users WHERE id = $1', [studentId]);
+      if (admin.rows[0]) {
+        await createNotification({
+          userId: admin.rows[0].admin_id,
+          title: `New application: ${cls.rows[0].name}`,
+          message: `${student.rows[0]?.name} has applied to join "${cls.rows[0].name}".${stripeNotConfigured ? ' (Payment pending — Stripe not configured)' : ''}`,
+          type: 'class',
+          metadata: { applicationId, classId },
+        });
+      }
     }
 
     res.status(201).json({
@@ -115,6 +192,10 @@ router.post('/', authenticate, authorize('student'), async (req, res) => {
       feeWaived,
       feeAmount: feeWaived ? 0 : feeAmount,
       currencyCode,
+      // Stripe fields — frontend uses these to decide what to do next
+      checkoutUrl,          // non-null → redirect to Stripe
+      stripeSessionId,
+      stripeNotConfigured,  // true → Stripe not set up yet, show placeholder message
     });
   } catch (err) {
     console.error(err);
@@ -137,6 +218,12 @@ router.get('/', authenticate, async (req, res) => {
   } else if (role === 'admin') {
     where.push(`EXISTS (SELECT 1 FROM classes c WHERE c.id = ca.class_id AND c.admin_id = $${idx++})`);
     params.push(userId);
+  }
+
+  // Admins only see applications where payment is confirmed, waived, or pre-Stripe (legacy)
+  // Students see all their own applications regardless of payment state
+  if (role !== 'student') {
+    where.push(`(ca.payment_status IS NULL OR ca.payment_status NOT IN ('pending_payment', 'failed'))`);
   }
 
   if (status) { where.push(`ca.status = $${idx++}`); params.push(status); }

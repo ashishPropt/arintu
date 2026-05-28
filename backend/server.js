@@ -8,22 +8,32 @@ app.use(cors({
   origin: process.env.FRONTEND_URL || 'http://localhost:5173',
   credentials: true,
 }));
+
+// ── Stripe webhook must receive the RAW body — register BEFORE express.json() ─
+// This route uses express.raw() only for itself; all other routes get JSON parsing below.
+app.post(
+  '/api/payments/webhook',
+  express.raw({ type: 'application/json' }),
+  require('./routes/stripeWebhook')
+);
+
 app.use(express.json());
 
 // Routes
-app.use('/api/auth', require('./routes/auth'));
-app.use('/api/users', require('./routes/users'));
-app.use('/api/classes', require('./routes/classes'));
-app.use('/api/schedules', require('./routes/schedules'));
+app.use('/api/auth',          require('./routes/auth'));
+app.use('/api/users',         require('./routes/users'));
+app.use('/api/classes',       require('./routes/classes'));
+app.use('/api/schedules',     require('./routes/schedules'));
 app.use('/api/notifications', require('./routes/notifications'));
-app.use('/api/regions', require('./routes/regions'));
-app.use('/api/pricing', require('./routes/pricing'));
-app.use('/api/mathwave', require('./routes/mathwave'));
-app.use('/api/countries', require('./routes/countries'));
-app.use('/api/applications', require('./routes/applications'));
-app.use('/api/waivers', require('./routes/waivers'));
-app.use('/api/content', require('./routes/content'));
-app.use('/api/public', require('./routes/public'));
+app.use('/api/regions',       require('./routes/regions'));
+app.use('/api/pricing',       require('./routes/pricing'));
+app.use('/api/mathwave',      require('./routes/mathwave'));
+app.use('/api/countries',     require('./routes/countries'));
+app.use('/api/applications',  require('./routes/applications'));
+app.use('/api/waivers',       require('./routes/waivers'));
+app.use('/api/content',       require('./routes/content'));
+app.use('/api/payments',      require('./routes/payments'));
+app.use('/api/public',        require('./routes/public'));
 
 app.get('/api/health', (req, res) => res.json({ status: 'ok', version: '1.0.0' }));
 

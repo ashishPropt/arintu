@@ -89,6 +89,11 @@ export const applications = {
     api.put(`/applications/${id}/scholarship`, { type, discountPct }),
 };
 
+export const payments = {
+  verify: (sessionId) => api.get(`/payments/verify/${sessionId}`),
+  cancelPending: (applicationId) => api.delete(`/payments/cancel/${applicationId}`),
+};
+
 export const waivers = {
   request: (reason) => api.post('/waivers', { reason }),
   getMyStatus: () => api.get('/waivers/me'),

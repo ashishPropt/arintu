@@ -5,6 +5,11 @@ import { useAuth } from '../contexts/AuthContext';
 import Modal from '../components/Modal';
 import axios from 'axios';
 
+// ── Stripe Checkout redirect ───────────────────────────────────────────────
+// No @stripe/stripe-js needed — we just redirect to the hosted Stripe URL
+// returned by the backend. The backend handles session creation.
+// ─────────────────────────────────────────────────────────────────────────
+
 // Detect country from IP using ipapi.co (free, no key needed)
 async function detectCountryCode() {
   try {
@@ -397,28 +402,58 @@ function ApplyModal({ cls, countryCode, country, onClose, onApplied }) {
     setSubmitting(true);
     setError('');
     try {
-      await applications.apply(
+      const res = await applications.apply(
         cls.id,
         countryCode,
         scholarshipRequested,
         scholarshipRequested ? scholarshipType : undefined
       );
-      setSuccess(true);
-      setTimeout(onApplied, 2000);
+      const data = res.data;
+
+      if (data.checkoutUrl) {
+        // ── Stripe configured: redirect to hosted Checkout page ───────────────
+        // User will return to /payment/success or /payment/cancel
+        window.location.href = data.checkoutUrl;
+        return; // don't clear submitting — page is navigating away
+      }
+
+      if (data.stripeNotConfigured) {
+        // ── Placeholder mode: Stripe keys not yet added to .env ───────────────
+        // Application is saved; admin can see it and process payment offline
+        setSuccess('placeholder');
+      } else {
+        // ── Fee waived: no payment needed ─────────────────────────────────────
+        setSuccess('waived');
+      }
+      setTimeout(onApplied, 2500);
     } catch (err) {
       setError(err.response?.data?.error || 'Failed to submit application');
     } finally { setSubmitting(false); }
   };
 
-  if (success) {
+  if (success === 'waived') {
     return (
       <Modal open title="Application Submitted!" onClose={onClose} size="sm">
         <div className="text-center py-6">
           <div className="text-5xl mb-4">🎉</div>
-          <p className="text-gray-800 font-semibold text-base">You're all set!</p>
+          <p className="text-gray-800 font-semibold text-base">Application received!</p>
           <p className="text-sm text-gray-500 mt-2">
-            Your application for <strong>{cls.name}</strong> has been submitted.
-            {scholarshipRequested && ' Your scholarship request is included and will be reviewed by the super admin.'}
+            Your application for <strong>{cls.name}</strong> has been submitted — your application fee was waived.
+            {scholarshipRequested && " Your scholarship request is included and will be reviewed by the super admin."}
+          </p>
+        </div>
+      </Modal>
+    );
+  }
+
+  if (success === 'placeholder') {
+    return (
+      <Modal open title="Application Received" onClose={onClose} size="sm">
+        <div className="text-center py-6">
+          <div className="text-5xl mb-4">📋</div>
+          <p className="text-gray-800 font-semibold text-base">Application submitted</p>
+          <p className="text-sm text-gray-500 mt-2">
+            Your application for <strong>{cls.name}</strong> has been received. Payment collection is being set up — our team will contact you about the application fee.
           </p>
         </div>
       </Modal>
@@ -493,14 +528,25 @@ function ApplyModal({ cls, countryCode, country, onClose, onApplied }) {
             )}
           </div>
 
-          <p className="text-xs text-gray-500">
-            Payment will be collected upon approval. You'll be notified once reviewed.
-          </p>
+          {/* Payment note */}
+          {!(feeInfo?.fee_waived || Number(feeInfo?.fee) === 0) && (
+            <div className="flex items-center gap-2 px-1 text-xs text-gray-500">
+              <svg className="w-3.5 h-3.5 text-gray-400 shrink-0" viewBox="0 0 20 20" fill="currentColor">
+                <path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd"/>
+              </svg>
+              You'll be taken to Stripe's secure checkout page to complete payment.
+            </div>
+          )}
 
           <div className="flex gap-2 pt-1">
             <button onClick={onClose} className="btn-secondary flex-1">Cancel</button>
             <button onClick={submit} disabled={submitting} className="btn-primary flex-1">
-              {submitting ? 'Submitting…' : 'Submit Application'}
+              {submitting
+                ? 'Processing…'
+                : (feeInfo?.fee_waived || Number(feeInfo?.fee) === 0)
+                  ? 'Submit Application'
+                  : `Pay ${feeInfo?.currency_symbol || ''}${feeInfo?.fee} & Apply`
+              }
             </button>
           </div>
         </div>
