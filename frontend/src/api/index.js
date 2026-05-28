@@ -23,6 +23,7 @@ api.interceptors.response.use(
 
 export const auth = {
   login: (data) => api.post('/auth/login', data),
+  register: (data) => api.post('/auth/register', data),
   me: () => api.get('/auth/me'),
   changePassword: (data) => api.post('/auth/change-password', data),
 };

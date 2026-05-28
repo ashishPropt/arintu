@@ -45,6 +45,45 @@ router.post(
   }
 );
 
+// POST /api/auth/register  (public — students only)
+router.post(
+  '/register',
+  [
+    body('name').trim().notEmpty().withMessage('Name is required'),
+    body('email').isEmail().normalizeEmail().withMessage('Valid email required'),
+    body('password').isLength({ min: 6 }).withMessage('Password must be at least 6 characters'),
+  ],
+  async (req, res) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) return res.status(400).json({ error: errors.array()[0].msg });
+
+    const { name, email, password } = req.body;
+    try {
+      // Check email not already taken
+      const existing = await db.query('SELECT id FROM users WHERE email = $1', [email]);
+      if (existing.rows.length > 0) {
+        return res.status(409).json({ error: 'An account with this email already exists' });
+      }
+
+      const hash = await bcrypt.hash(password, 12);
+      const result = await db.query(
+        `INSERT INTO users (name, email, password_hash, role, is_active)
+         VALUES ($1, $2, $3, 'student', true) RETURNING id, email, name, role`,
+        [name, email, hash]
+      );
+      const user = result.rows[0];
+
+      const token = jwt.sign({ userId: user.id }, process.env.JWT_SECRET, {
+        expiresIn: process.env.JWT_EXPIRES_IN || '7d',
+      });
+
+      res.status(201).json({ token, user });
+    } catch (err) {
+      res.status(500).json({ error: 'Server error' });
+    }
+  }
+);
+
 // GET /api/auth/me
 router.get('/me', authenticate, async (req, res) => {
   const result = await db.query(

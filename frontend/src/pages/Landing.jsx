@@ -24,7 +24,8 @@ export default function Landing() {
   const [selectedCode, setSelectedCode] = useState('US');
   const [classes, setClasses] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [applyTarget, setApplyTarget] = useState(null); // class to apply to
+  const [applyTarget, setApplyTarget] = useState(null);  // class to apply to (logged-in student)
+  const [authTarget, setAuthTarget] = useState(null);    // class that triggered auth modal (guest)
 
   // Auto-detect country on mount
   useEffect(() => {
@@ -42,19 +43,26 @@ export default function Landing() {
 
   useEffect(() => { loadClasses(); }, [loadClasses]);
 
-  // Auto-open apply modal if student was redirected here from login
-  useEffect(() => {
-    const pendingId = sessionStorage.getItem('applyClassId');
-    if (pendingId && user?.role === 'student' && classes.length > 0) {
-      const cls = classes.find((c) => String(c.id) === String(pendingId));
-      if (cls) {
-        sessionStorage.removeItem('applyClassId');
-        setApplyTarget(cls);
-      }
-    }
-  }, [user, classes]);
-
   const selectedCountry = countries.find((c) => c.code === selectedCode);
+
+  const handleApply = (cls) => {
+    if (!user) {
+      // Guest: show auth modal, remember which class they want
+      setAuthTarget(cls);
+    } else if (user.role === 'student') {
+      setApplyTarget(cls);
+    } else {
+      navigate('/app/dashboard');
+    }
+  };
+
+  // Called when auth succeeds inside the auth modal
+  const handleAuthSuccess = () => {
+    const cls = authTarget;
+    setAuthTarget(null);
+    // Small delay so auth state propagates
+    setTimeout(() => setApplyTarget(cls), 100);
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-brand-50 via-white to-accent-50">
@@ -84,7 +92,7 @@ export default function Landing() {
                 Dashboard
               </button>
             ) : (
-              <Link to="/login" className="btn-primary text-sm">Sign in</Link>
+              <Link to="/login" className="btn-secondary text-sm">Sign in</Link>
             )}
           </div>
         </div>
@@ -122,22 +130,23 @@ export default function Landing() {
                 cls={c}
                 selectedCountry={selectedCountry}
                 user={user}
-                onApply={() => {
-                  if (!user) {
-                    sessionStorage.setItem('applyClassId', c.id);
-                    navigate('/login');
-                  } else if (user.role === 'student') {
-                    setApplyTarget(c);
-                  } else {
-                    navigate('/app/dashboard');
-                  }
-                }}
+                onApply={() => handleApply(c)}
               />
             ))}
           </div>
         )}
       </section>
 
+      {/* Auth modal — shown to guests who click Apply Now */}
+      {authTarget && (
+        <AuthModal
+          cls={authTarget}
+          onClose={() => setAuthTarget(null)}
+          onSuccess={handleAuthSuccess}
+        />
+      )}
+
+      {/* Apply modal — shown to logged-in students */}
       {applyTarget && (
         <ApplyModal
           cls={applyTarget}
@@ -151,12 +160,170 @@ export default function Landing() {
   );
 }
 
+// ─── Auth Modal (Sign In / Create Account tabs) ────────────────────────────
+
+function AuthModal({ cls, onClose, onSuccess }) {
+  const [tab, setTab] = useState('register'); // 'register' | 'login'
+
+  return (
+    <Modal open title={`Apply to: ${cls.name}`} onClose={onClose} size="sm">
+      {/* Tabs */}
+      <div className="flex rounded-lg border border-gray-200 overflow-hidden mb-5">
+        {[
+          { key: 'register', label: 'Create Account' },
+          { key: 'login',    label: 'Sign In' },
+        ].map(({ key, label }) => (
+          <button
+            key={key}
+            onClick={() => setTab(key)}
+            className={`flex-1 py-2 text-sm font-medium transition-colors ${
+              tab === key ? 'bg-brand-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'
+            }`}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {tab === 'register'
+        ? <RegisterForm onSuccess={onSuccess} />
+        : <LoginForm onSuccess={onSuccess} />
+      }
+    </Modal>
+  );
+}
+
+function RegisterForm({ onSuccess }) {
+  const { register } = useAuth();
+  const [form, setForm] = useState({ name: '', email: '', password: '' });
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
+
+  const submit = async (e) => {
+    e.preventDefault();
+    setError('');
+    setLoading(true);
+    try {
+      await register(form.name, form.email, form.password);
+      onSuccess();
+    } catch (err) {
+      setError(err.response?.data?.error || 'Failed to create account');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <form onSubmit={submit} className="space-y-3">
+      {error && <div className="p-3 bg-red-50 text-red-600 rounded-lg text-sm">{error}</div>}
+      <div>
+        <label className="block text-xs font-medium text-gray-700 mb-1">Full Name</label>
+        <input
+          className="input"
+          placeholder="Your name"
+          value={form.name}
+          onChange={(e) => set('name', e.target.value)}
+          required
+        />
+      </div>
+      <div>
+        <label className="block text-xs font-medium text-gray-700 mb-1">Email</label>
+        <input
+          type="email"
+          className="input"
+          placeholder="you@example.com"
+          value={form.email}
+          onChange={(e) => set('email', e.target.value)}
+          required
+        />
+      </div>
+      <div>
+        <label className="block text-xs font-medium text-gray-700 mb-1">Password</label>
+        <input
+          type="password"
+          className="input"
+          placeholder="At least 6 characters"
+          value={form.password}
+          onChange={(e) => set('password', e.target.value)}
+          required
+          minLength={6}
+        />
+      </div>
+      <button type="submit" disabled={loading} className="btn-primary w-full mt-1">
+        {loading ? 'Creating account…' : 'Create Account & Continue'}
+      </button>
+      <p className="text-xs text-gray-400 text-center">
+        You'll be able to review the application fee on the next screen.
+      </p>
+    </form>
+  );
+}
+
+function LoginForm({ onSuccess }) {
+  const { login } = useAuth();
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  const submit = async (e) => {
+    e.preventDefault();
+    setError('');
+    setLoading(true);
+    try {
+      const u = await login(email, password);
+      if (u.role !== 'student') {
+        setError('Only student accounts can apply from here.');
+        return;
+      }
+      onSuccess();
+    } catch (err) {
+      setError(err.response?.data?.error || 'Login failed');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <form onSubmit={submit} className="space-y-3">
+      {error && <div className="p-3 bg-red-50 text-red-600 rounded-lg text-sm">{error}</div>}
+      <div>
+        <label className="block text-xs font-medium text-gray-700 mb-1">Email</label>
+        <input
+          type="email"
+          className="input"
+          placeholder="you@example.com"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          required
+        />
+      </div>
+      <div>
+        <label className="block text-xs font-medium text-gray-700 mb-1">Password</label>
+        <input
+          type="password"
+          className="input"
+          placeholder="••••••••"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          required
+        />
+      </div>
+      <button type="submit" disabled={loading} className="btn-primary w-full mt-1">
+        {loading ? 'Signing in…' : 'Sign In & Continue'}
+      </button>
+    </form>
+  );
+}
+
+// ─── Class Card ─────────────────────────────────────────────────────────────
+
 function ClassCard({ cls, selectedCountry, user, onApply }) {
   const teacher = cls.teachers?.[0];
 
   return (
     <div className="bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition-shadow overflow-hidden flex flex-col">
-      {/* Color bar */}
       <div className="h-1.5 bg-gradient-to-r from-brand-500 to-accent-500" />
 
       <div className="p-5 flex flex-col flex-1">
@@ -207,6 +374,8 @@ function ClassCard({ cls, selectedCountry, user, onApply }) {
   );
 }
 
+// ─── Apply Modal (after login/register) ─────────────────────────────────────
+
 function ApplyModal({ cls, countryCode, country, onClose, onApplied }) {
   const [feeInfo, setFeeInfo] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -227,7 +396,7 @@ function ApplyModal({ cls, countryCode, country, onClose, onApplied }) {
     try {
       await applications.apply(cls.id, countryCode);
       setSuccess(true);
-      setTimeout(onApplied, 1800);
+      setTimeout(onApplied, 2000);
     } catch (err) {
       setError(err.response?.data?.error || 'Failed to submit application');
     } finally { setSubmitting(false); }
@@ -235,11 +404,11 @@ function ApplyModal({ cls, countryCode, country, onClose, onApplied }) {
 
   if (success) {
     return (
-      <Modal open title="Application Submitted" onClose={onClose} size="sm">
-        <div className="text-center py-4">
-          <div className="text-4xl mb-3">🎉</div>
-          <p className="text-gray-700 font-medium">Your application has been submitted!</p>
-          <p className="text-sm text-gray-500 mt-1">You'll be notified once the admin reviews it.</p>
+      <Modal open title="Application Submitted!" onClose={onClose} size="sm">
+        <div className="text-center py-6">
+          <div className="text-5xl mb-4">🎉</div>
+          <p className="text-gray-800 font-semibold text-base">You're all set!</p>
+          <p className="text-sm text-gray-500 mt-2">Your application for <strong>{cls.name}</strong> has been submitted. The admin will review it and you'll be notified.</p>
         </div>
       </Modal>
     );
@@ -261,10 +430,9 @@ function ApplyModal({ cls, countryCode, country, onClose, onApplied }) {
             )}
           </div>
 
-          {/* Application fee info */}
-          <div className={`rounded-xl p-4 text-sm ${feeInfo?.fee_waived || feeInfo?.fee === 0 ? 'bg-green-50 border border-green-100' : 'bg-amber-50 border border-amber-100'}`}>
+          <div className={`rounded-xl p-4 text-sm ${feeInfo?.fee_waived || Number(feeInfo?.fee) === 0 ? 'bg-green-50 border border-green-100' : 'bg-amber-50 border border-amber-100'}`}>
             <p className="font-medium text-gray-900 mb-1">Application Fee</p>
-            {feeInfo?.fee_waived || feeInfo?.fee === 0 ? (
+            {feeInfo?.fee_waived || Number(feeInfo?.fee) === 0 ? (
               <p className="text-green-700 text-xs">✅ Waived — you're already enrolled in another class.</p>
             ) : (
               <div>
@@ -278,7 +446,7 @@ function ApplyModal({ cls, countryCode, country, onClose, onApplied }) {
           </div>
 
           <p className="text-xs text-gray-500">
-            Your application will be reviewed by the admin. Payment will be collected upon approval.
+            Payment will be collected upon approval. You'll receive a notification once reviewed.
           </p>
 
           <div className="flex gap-2 pt-1">
