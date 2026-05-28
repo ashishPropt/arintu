@@ -24,7 +24,7 @@ const features = [
   {
     icon: '🗓️',
     title: 'Smart Scheduling',
-    desc: 'Our scheduling system considers timezones, public holidays, and teacher availability to find slots that work for every student. You'll never miss a class due to a scheduling conflict.',
+    desc: "Our scheduling system considers timezones, public holidays, and teacher availability to find slots that work for every student. You'll never miss a class due to a scheduling conflict.",
   },
   {
     icon: '💬',

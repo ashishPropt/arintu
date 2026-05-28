@@ -2,16 +2,16 @@ import { useState } from 'react';
 
 const faqs = [
   {
-    q: 'Who are Arintu's classes for?',
+    q: "Who are Arintu's classes for?",
     a: 'Our classes are designed for motivated learners of all ages who want to go beyond what their local school or institution offers. We serve students from primary school through to working professionals looking to upskill.',
   },
   {
     q: 'How do I enrol in a class?',
-    a: 'Browse our class catalogue on the home page. Click "Apply Now" on any class you're interested in. You'll need to create a free account (or sign in) and submit an application. Applications are reviewed and you'll be notified of the outcome within a few days.',
+    a: "Browse our class catalogue on the home page. Click \"Apply Now\" on any class you're interested in. You'll need to create a free account (or sign in) and submit an application. Applications are reviewed and you'll be notified of the outcome within a few days.",
   },
   {
     q: 'Is there an application fee?',
-    a: 'Yes, there is a one-time application fee that varies by country. The fee is charged on your first class application and is waived for all subsequent classes. If you're unable to pay the fee, you can request a waiver from your dashboard — a super admin will review your request.',
+    a: "Yes, there is a one-time application fee that varies by country. The fee is charged on your first class application and is waived for all subsequent classes. If you're unable to pay the fee, you can request a waiver from your dashboard — a super admin will review your request.",
   },
   {
     q: 'What is the scholarship programme?',
@@ -26,7 +26,7 @@ const faqs = [
     a: 'The majority of our classes are taught in English. We periodically offer classes in Hindi and other languages — check the class description for language details.',
   },
   {
-    q: 'Can I drop a class once I've enrolled?',
+    q: "Can I drop a class once I've enrolled?",
     a: 'Please contact your class teacher or reach out to us at hello@arintu.com. Refund and withdrawal policies depend on the class and how far along the course has progressed.',
   },
   {
@@ -39,7 +39,7 @@ const faqs = [
   },
   {
     q: 'How do I get in touch with support?',
-    a: 'Email us at hello@arintu.com or reach out through the dashboard's notification system. We aim to respond to all queries within one business day.',
+    a: "Email us at hello@arintu.com or reach out through the dashboard's notification system. We aim to respond to all queries within one business day.",
   },
 ];
 

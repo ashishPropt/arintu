@@ -5,7 +5,7 @@ const openings = [
     location: 'Remote — Global',
     type: 'Full-time',
     description:
-      'Work with our faculty to design engaging, outcome-focused curricula. You'll own the arc of every learning module — from concept to student feedback loop.',
+      "Work with our faculty to design engaging, outcome-focused curricula. You'll own the arc of every learning module — from concept to student feedback loop.",
     requirements: [
       '3+ years designing instructional content or e-learning programmes',
       'Familiarity with competency-based frameworks',
@@ -18,7 +18,7 @@ const openings = [
     location: 'Remote — Global',
     type: 'Full-time',
     description:
-      'Help build and scale the Arintu platform. You'll work across the stack — React frontend, Node.js API, PostgreSQL — and contribute to our AI-assisted learning roadmap.',
+      "Help build and scale the Arintu platform. You'll work across the stack — React frontend, Node.js API, PostgreSQL — and contribute to our AI-assisted learning roadmap.",
     requirements: [
       '2+ years with React and Node.js / Express',
       'Comfortable with PostgreSQL and REST API design',
@@ -31,7 +31,7 @@ const openings = [
     location: 'Remote — Asia / Pacific',
     type: 'Full-time',
     description:
-      'Be the first point of contact for our learners. You'll guide students through enrolment, monitor engagement, and work with teachers to intervene before issues become crises.',
+      "Be the first point of contact for our learners. You'll guide students through enrolment, monitor engagement, and work with teachers to intervene before issues become crises.",
     requirements: [
       '2+ years in customer success, student advising, or a related role',
       'Fluency in English; additional language a bonus',
@@ -44,7 +44,7 @@ const openings = [
     location: 'Remote — Global',
     type: 'Full-time',
     description:
-      'Grow our learner community across channels. You'll manage social presence, run campaigns, and nurture the Enfinitty Circle and Book Club programmes.',
+      "Grow our learner community across channels. You'll manage social presence, run campaigns, and nurture the Enfinitty Circle and Book Club programmes.",
     requirements: [
       '3+ years in growth marketing or community management',
       'Data-driven, with experience measuring engagement funnels',

@@ -29,7 +29,7 @@ const benefits = [
   {
     icon: '🤝',
     title: 'Alumni Community',
-    desc: 'Stay connected after your course ends. The alumni network is active on a private forum where members collaborate, share opportunities, and support each other's growth.',
+    desc: "Stay connected after your course ends. The alumni network is active on a private forum where members collaborate, share opportunities, and support each other's growth.",
   },
 ];
 
