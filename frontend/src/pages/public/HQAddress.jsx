@@ -15,8 +15,8 @@ export default function HQAddress() {
           <h2 className="font-semibold text-gray-900 mb-1">Mailing Address</h2>
           <address className="not-italic text-sm text-gray-600 leading-relaxed">
             Arintu Learning Inc.<br />
-            2450 Camino Ramon, Suite 110<br />
-            San Ramon, CA 94583<br />
+            12268 Darkwood Road<br />
+            San Diego, CA 92129<br />
             United States
           </address>
         </div>
@@ -32,8 +32,8 @@ export default function HQAddress() {
           <p className="text-sm text-gray-600 mb-3">
             Have a question or want to partner with us? We'd love to hear from you.
           </p>
-          <a href="mailto:hello@arintu.com" className="text-sm font-medium text-brand-600 hover:underline">
-            hello@arintu.com
+          <a href="mailto:infoenfinitty@gmail.com" className="text-sm font-medium text-brand-600 hover:underline">
+            infoenfinitty@gmail.com
           </a>
         </div>
 

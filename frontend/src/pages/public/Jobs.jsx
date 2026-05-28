@@ -105,7 +105,7 @@ export default function Jobs() {
             </div>
 
             <a
-              href={`mailto:careers@arintu.com?subject=Application: ${encodeURIComponent(job.title)}`}
+              href={`mailto:infoenfinitty@gmail.com?subject=Application: ${encodeURIComponent(job.title)}`}
               className="inline-flex items-center gap-1.5 text-sm font-medium text-white bg-brand-600 hover:bg-brand-700 px-4 py-2 rounded-lg transition-colors"
             >
               Apply via email
@@ -123,7 +123,7 @@ export default function Jobs() {
         <p className="text-sm text-brand-700 mb-3">
           We're always interested in hearing from talented people who share our mission.
         </p>
-        <a href="mailto:careers@arintu.com" className="text-sm font-medium text-brand-600 hover:underline">
+        <a href="mailto:infoenfinitty@gmail.com" className="text-sm font-medium text-brand-600 hover:underline">
           Send us an open application →
         </a>
       </div>

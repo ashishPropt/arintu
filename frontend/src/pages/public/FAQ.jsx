@@ -27,7 +27,7 @@ const faqs = [
   },
   {
     q: "Can I drop a class once I've enrolled?",
-    a: 'Please contact your class teacher or reach out to us at hello@arintu.com. Refund and withdrawal policies depend on the class and how far along the course has progressed.',
+    a: 'Please contact your class teacher or reach out to us at infoenfinitty@gmail.com. Refund and withdrawal policies depend on the class and how far along the course has progressed.',
   },
   {
     q: 'How are teachers vetted?',
@@ -39,7 +39,7 @@ const faqs = [
   },
   {
     q: 'How do I get in touch with support?',
-    a: "Email us at hello@arintu.com or reach out through the dashboard's notification system. We aim to respond to all queries within one business day.",
+    a: "Email us at infoenfinitty@gmail.com or reach out through the dashboard's notification system. We aim to respond to all queries within one business day.",
   },
 ];
 
@@ -74,7 +74,7 @@ export default function FAQ() {
       <h1 className="text-2xl font-bold text-gray-900 mb-2">Frequently Asked Questions</h1>
       <p className="text-gray-500 mb-10">
         Everything you need to know about learning with Arintu. Can't find the answer you're looking for?{' '}
-        <a href="mailto:hello@arintu.com" className="text-brand-600 hover:underline">Send us an email.</a>
+        <a href="mailto:infoenfinitty@gmail.com" className="text-brand-600 hover:underline">Send us an email.</a>
       </p>
 
       <div className="space-y-3">

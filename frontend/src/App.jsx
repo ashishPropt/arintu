@@ -29,6 +29,9 @@ import FAQ from './pages/public/FAQ';
 import BookClub from './pages/public/BookClub';
 import ArintuOnline from './pages/public/ArintuOnline';
 import EnfinittyCircle from './pages/public/EnfinittyCircle';
+import ContactUs from './pages/public/ContactUs';
+import Terms from './pages/public/Terms';
+import Privacy from './pages/public/Privacy';
 
 function RequireAuth({ children, roles }) {
   const { user, loading } = useAuth();
@@ -63,6 +66,9 @@ export default function App() {
             <Route path="/community/book-club"        element={<BookClub />} />
             <Route path="/community/arintu-online"    element={<ArintuOnline />} />
             <Route path="/community/enfinitty-circle" element={<EnfinittyCircle />} />
+            <Route path="/contact" element={<ContactUs />} />
+            <Route path="/terms"   element={<Terms />} />
+            <Route path="/privacy" element={<Privacy />} />
           </Route>
 
           {/* Authenticated app */}
