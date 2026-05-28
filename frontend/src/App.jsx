@@ -10,6 +10,8 @@ import Users from './pages/Users';
 import Pricing from './pages/superadmin/Pricing';
 import Regions from './pages/superadmin/Regions';
 import Countries from './pages/superadmin/Countries';
+import FeeWaivers from './pages/superadmin/FeeWaivers';
+import Scholarships from './pages/superadmin/Scholarships';
 import Applications from './pages/admin/Applications';
 
 function RequireAuth({ children, roles }) {
@@ -59,6 +61,16 @@ export default function App() {
             <Route path="applications" element={
               <RequireAuth roles={['superadmin', 'admin']}>
                 <Applications />
+              </RequireAuth>
+            } />
+            <Route path="fee-waivers" element={
+              <RequireAuth roles={['superadmin']}>
+                <FeeWaivers />
+              </RequireAuth>
+            } />
+            <Route path="scholarships" element={
+              <RequireAuth roles={['superadmin']}>
+                <Scholarships />
               </RequireAuth>
             } />
           </Route>

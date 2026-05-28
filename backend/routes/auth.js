@@ -88,6 +88,7 @@ router.post(
 router.get('/me', authenticate, async (req, res) => {
   const result = await db.query(
     `SELECT u.id, u.email, u.name, u.role, u.phone, u.avatar_url, u.region_id,
+            u.fee_waiver_status,
             r.name as region_name
      FROM users u LEFT JOIN regions r ON r.id = u.region_id
      WHERE u.id = $1`,

@@ -7,10 +7,22 @@ const router = express.Router();
 
 // POST /api/applications  — student submits an application
 router.post('/', authenticate, authorize('student'), async (req, res) => {
-  const { classId, countryCode } = req.body;
+  const { classId, countryCode, scholarshipRequested, scholarshipType } = req.body;
   const studentId = req.user.id;
 
   try {
+    // Block students with a pending fee waiver request
+    const waiver = await db.query(
+      'SELECT fee_waiver_status FROM users WHERE id = $1',
+      [studentId]
+    );
+    if (waiver.rows[0]?.fee_waiver_status === 'pending') {
+      return res.status(403).json({
+        error: 'Your fee waiver request is pending super admin review. You cannot apply until it is processed.',
+        code: 'WAIVER_PENDING',
+      });
+    }
+
     // Check class exists and is active
     const cls = await db.query('SELECT * FROM classes WHERE id = $1 AND is_active = TRUE', [classId]);
     if (!cls.rows[0]) return res.status(404).json({ error: 'Class not found' });
@@ -32,7 +44,7 @@ router.post('/', authenticate, authorize('student'), async (req, res) => {
     }
 
     // Determine if application fee applies
-    // Fee waived if student already has at least one approved application elsewhere
+    // Fee waived if: super admin approved a waiver, OR student is already enrolled elsewhere
     const prevApproved = await db.query(
       `SELECT COUNT(*) FROM class_applications
        WHERE student_id = $1 AND status = 'approved' AND class_id != $2`,
@@ -43,6 +55,7 @@ router.post('/', authenticate, authorize('student'), async (req, res) => {
       [studentId]
     );
     const feeWaived =
+      waiver.rows[0]?.fee_waiver_status === 'approved' ||
       parseInt(prevApproved.rows[0].count) > 0 ||
       parseInt(alreadyEnrolledElsewhere.rows[0].count) > 0;
 
@@ -72,12 +85,15 @@ router.post('/', authenticate, authorize('student'), async (req, res) => {
     }
 
     // Insert application
+    const scholType = scholarshipRequested ? (scholarshipType || 'partial') : 'none';
     const result = await db.query(
       `INSERT INTO class_applications
-         (class_id, student_id, country_id, application_fee_charged, currency_code, fee_waived)
-       VALUES ($1, $2, $3, $4, $5, $6)
+         (class_id, student_id, country_id, application_fee_charged, currency_code, fee_waived,
+          scholarship_requested, scholarship_type)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
        RETURNING *`,
-      [classId, studentId, countryId, feeWaived ? 0 : feeAmount, currencyCode, feeWaived]
+      [classId, studentId, countryId, feeWaived ? 0 : feeAmount, currencyCode, feeWaived,
+       scholarshipRequested || false, scholType]
     );
 
     // Notify admin(s) who own the class
@@ -108,7 +124,7 @@ router.post('/', authenticate, authorize('student'), async (req, res) => {
 
 // GET /api/applications  — admin/superadmin sees all; student sees own
 router.get('/', authenticate, async (req, res) => {
-  const { status, classId } = req.query;
+  const { status, classId, scholarshipOnly } = req.query;
   const { id: userId, role } = req.user;
 
   let where = ['1=1'];
@@ -125,23 +141,68 @@ router.get('/', authenticate, async (req, res) => {
 
   if (status) { where.push(`ca.status = $${idx++}`); params.push(status); }
   if (classId) { where.push(`ca.class_id = $${idx++}`); params.push(classId); }
+  if (scholarshipOnly === 'true') { where.push(`ca.scholarship_requested = TRUE`); }
 
   try {
     const result = await db.query(
       `SELECT ca.*,
               u.name as student_name, u.email as student_email,
-              cl.name as class_name,
-              co.name as country_name, co.currency_symbol
+              cl.name as class_name, cl.scholarship_slots,
+              co.name as country_name, co.currency_symbol,
+              sr.name as scholarship_reviewer_name
        FROM class_applications ca
        JOIN users u ON u.id = ca.student_id
        JOIN classes cl ON cl.id = ca.class_id
        LEFT JOIN countries co ON co.id = ca.country_id
+       LEFT JOIN users sr ON sr.id = ca.scholarship_reviewed_by
        WHERE ${where.join(' AND ')}
        ORDER BY ca.applied_at DESC`,
       params
     );
     res.json(result.rows);
   } catch (err) {
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// PUT /api/applications/:id/scholarship  — super admin awards / updates scholarship
+router.put('/:id/scholarship', authenticate, authorize('superadmin'), async (req, res) => {
+  const { type, discountPct } = req.body;
+  if (!['none', 'partial', 'full'].includes(type)) {
+    return res.status(400).json({ error: 'type must be none, partial, or full' });
+  }
+  if (type === 'partial' && (discountPct == null || discountPct <= 0 || discountPct >= 100)) {
+    return res.status(400).json({ error: 'Partial scholarship requires a discount percentage (1–99)' });
+  }
+  try {
+    const result = await db.query(
+      `UPDATE class_applications SET
+         scholarship_type        = $2,
+         scholarship_discount_pct = $3,
+         scholarship_reviewed_by  = $4,
+         scholarship_reviewed_at  = NOW()
+       WHERE id = $1
+       RETURNING *, (SELECT name FROM classes WHERE id = class_id) as class_name`,
+      [req.params.id, type, type === 'partial' ? discountPct : (type === 'full' ? 100 : null), req.user.id]
+    );
+    if (!result.rows[0]) return res.status(404).json({ error: 'Application not found' });
+
+    // Notify student if a scholarship was awarded
+    if (type !== 'none') {
+      const app = result.rows[0];
+      const msg = type === 'full'
+        ? `Congratulations! You have been awarded a full scholarship for "${app.class_name}". Your class fee is fully covered!`
+        : `Congratulations! You have been awarded a partial scholarship (${discountPct}% off) for "${app.class_name}".`;
+      await db.query(
+        `INSERT INTO notifications (user_id, title, message, type)
+         VALUES ($1, 'Scholarship Awarded 🎓', $2, 'info')`,
+        [result.rows[0].student_id, msg]
+      );
+    }
+
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error(err);
     res.status(500).json({ error: 'Server error' });
   }
 });

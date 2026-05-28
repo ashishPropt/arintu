@@ -81,9 +81,19 @@ export const countries = {
 
 export const applications = {
   list: (params) => api.get('/applications', { params }),
-  apply: (classId, countryCode) => api.post('/applications', { classId, countryCode }),
+  apply: (classId, countryCode, scholarshipRequested, scholarshipType) =>
+    api.post('/applications', { classId, countryCode, scholarshipRequested, scholarshipType }),
   approve: (id) => api.put(`/applications/${id}/approve`),
   reject: (id, notes) => api.put(`/applications/${id}/reject`, { notes }),
+  awardScholarship: (id, type, discountPct) =>
+    api.put(`/applications/${id}/scholarship`, { type, discountPct }),
+};
+
+export const waivers = {
+  request: (reason) => api.post('/waivers', { reason }),
+  getMyStatus: () => api.get('/waivers/me'),
+  list: (params) => api.get('/waivers', { params }),
+  review: (userId, action, notes) => api.put(`/waivers/${userId}/review`, { action, notes }),
 };
 
 export const publicApi = {

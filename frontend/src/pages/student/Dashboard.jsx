@@ -1,11 +1,15 @@
 import { useState, useEffect } from 'react';
-import { classes, schedules } from '../../api';
+import { classes, schedules, waivers as waiversApi } from '../../api';
+import { useAuth } from '../../contexts/AuthContext';
 import { Link } from 'react-router-dom';
 import { format } from 'date-fns';
+import Modal from '../../components/Modal';
 
 export default function StudentDashboard() {
+  const { user, reload: reloadUser } = useAuth();
   const [myClasses, setMyClasses] = useState([]);
   const [upcoming, setUpcoming] = useState([]);
+  const [showWaiverModal, setShowWaiverModal] = useState(false);
 
   useEffect(() => {
     Promise.all([
@@ -17,10 +21,18 @@ export default function StudentDashboard() {
     }).catch(() => {});
   }, []);
 
+  const waiverStatus = user?.fee_waiver_status;
+
   return (
     <div>
       <h1 className="text-xl font-bold text-gray-900 mb-1">My Learning</h1>
       <p className="text-sm text-gray-500 mb-6">Your enrolled classes and upcoming sessions</p>
+
+      {/* Fee Waiver Status Card */}
+      <WaiverCard
+        status={waiverStatus}
+        onRequest={() => setShowWaiverModal(true)}
+      />
 
       <div className="grid md:grid-cols-2 gap-4 mb-4">
         <div className="card p-4 flex items-center gap-3">
@@ -70,6 +82,120 @@ export default function StudentDashboard() {
           </div>
         )}
       </div>
+
+      {showWaiverModal && (
+        <RequestWaiverModal
+          onClose={() => setShowWaiverModal(false)}
+          onSubmitted={() => { setShowWaiverModal(false); reloadUser(); }}
+        />
+      )}
     </div>
+  );
+}
+
+function WaiverCard({ status, onRequest }) {
+  if (status === 'approved') {
+    return (
+      <div className="mb-5 flex items-center gap-3 p-4 rounded-xl bg-green-50 border border-green-100">
+        <span className="text-2xl">✅</span>
+        <div>
+          <p className="text-sm font-semibold text-green-800">Application Fee Waived</p>
+          <p className="text-xs text-green-700">Your fee waiver has been approved. You can apply to classes without paying the application fee.</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (status === 'pending') {
+    return (
+      <div className="mb-5 flex items-center gap-3 p-4 rounded-xl bg-amber-50 border border-amber-100">
+        <span className="text-2xl">⏳</span>
+        <div>
+          <p className="text-sm font-semibold text-amber-800">Fee Waiver Request Pending</p>
+          <p className="text-xs text-amber-700">Your request is being reviewed by the super admin. You cannot apply to classes until a decision is made.</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (status === 'rejected') {
+    return (
+      <div className="mb-5 p-4 rounded-xl bg-red-50 border border-red-100">
+        <div className="flex items-center gap-3 mb-2">
+          <span className="text-2xl">❌</span>
+          <div>
+            <p className="text-sm font-semibold text-red-800">Fee Waiver Not Approved</p>
+            <p className="text-xs text-red-700">Your waiver request was not approved. You can still apply to classes by paying the standard application fee.</p>
+          </div>
+        </div>
+        <button onClick={onRequest} className="text-xs text-red-600 underline hover:no-underline">
+          Submit a new request
+        </button>
+      </div>
+    );
+  }
+
+  // No waiver requested yet
+  return (
+    <div className="mb-5 flex items-start gap-3 p-4 rounded-xl bg-gray-50 border border-gray-100">
+      <span className="text-2xl">💰</span>
+      <div className="flex-1">
+        <p className="text-sm font-semibold text-gray-800">Application Fee Waiver</p>
+        <p className="text-xs text-gray-600 mt-0.5">
+          If you have financial difficulty paying the one-time application fee, you can request a waiver.
+          The super admin will review your request. <strong>Note:</strong> you cannot apply to any class while your request is pending.
+        </p>
+        <button onClick={onRequest} className="mt-2 text-xs font-medium text-brand-600 hover:underline">
+          Request a fee waiver →
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function RequestWaiverModal({ onClose, onSubmitted }) {
+  const [reason, setReason] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  const submit = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    setError('');
+    try {
+      await waiversApi.request(reason);
+      onSubmitted();
+    } catch (err) {
+      setError(err.response?.data?.error || 'Failed to submit request');
+    } finally { setLoading(false); }
+  };
+
+  return (
+    <Modal open title="Request Fee Waiver" onClose={onClose} size="sm">
+      <form onSubmit={submit} className="space-y-4">
+        {error && <div className="p-3 bg-red-50 text-red-600 rounded-lg text-sm">{error}</div>}
+        <div className="p-3 bg-amber-50 border border-amber-100 rounded-lg text-xs text-amber-700">
+          ⚠️ While your waiver request is pending, you will not be able to apply to any class. Make sure you want to proceed.
+        </div>
+        <div>
+          <label className="block text-xs font-medium text-gray-700 mb-1">
+            Reason for requesting a waiver <span className="text-gray-400">(optional but recommended)</span>
+          </label>
+          <textarea
+            className="input"
+            rows={4}
+            value={reason}
+            onChange={(e) => setReason(e.target.value)}
+            placeholder="Briefly explain why you need the application fee waived…"
+          />
+        </div>
+        <div className="flex gap-2 justify-end">
+          <button type="button" onClick={onClose} className="btn-secondary">Cancel</button>
+          <button type="submit" disabled={loading} className="btn-primary">
+            {loading ? 'Submitting…' : 'Submit Request'}
+          </button>
+        </div>
+      </form>
+    </Modal>
   );
 }
