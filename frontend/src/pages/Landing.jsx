@@ -1,8 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { publicApi, countries as countriesApi, applications } from '../api';
 import { useAuth } from '../contexts/AuthContext';
-import Logo from '../components/Logo';
 import Modal from '../components/Modal';
 import axios from 'axios';
 
@@ -70,39 +69,7 @@ export default function Landing() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-brand-50 via-white to-accent-50">
-      {/* Header */}
-      <header className="bg-white/80 backdrop-blur-sm border-b border-gray-100 sticky top-0 z-10">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between">
-          <Logo size="md" />
-          <div className="flex items-center gap-3">
-            {/* Country picker */}
-            <div className="flex items-center gap-1.5">
-              <span className="text-xs text-gray-500 hidden sm:block">Pricing for:</span>
-              <select
-                className="text-sm border border-gray-200 rounded-lg px-2.5 py-1.5 bg-white focus:outline-none focus:ring-2 focus:ring-brand-500"
-                value={selectedCode}
-                onChange={(e) => setSelectedCode(e.target.value)}
-              >
-                {countries.map((c) => (
-                  <option key={c.code} value={c.code}>
-                    {c.name} ({c.currency_code})
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            {user ? (
-              <button onClick={() => navigate('/app/dashboard')} className="btn-primary text-sm">
-                Dashboard
-              </button>
-            ) : (
-              <Link to="/login" className="btn-secondary text-sm">Sign in</Link>
-            )}
-          </div>
-        </div>
-      </header>
-
+    <div>
       {/* Hero */}
       <section className="max-w-6xl mx-auto px-4 sm:px-6 pt-14 pb-10 text-center">
         <h1 className="text-3xl sm:text-4xl font-bold text-gray-900 mb-3">
@@ -114,15 +81,25 @@ export default function Landing() {
         <p className="text-gray-500 max-w-xl mx-auto text-base">
           Expert-led classes for every learner. Browse, apply, and start learning today.
         </p>
-        {selectedCountry && (
-          <p className="mt-3 text-sm text-brand-600 font-medium">
-            Showing prices in {selectedCountry.currency_name} ({selectedCountry.currency_symbol})
-          </p>
-        )}
+        {/* Country picker */}
+        <div className="mt-5 inline-flex items-center gap-2 bg-white border border-gray-200 rounded-xl px-4 py-2 shadow-sm">
+          <span className="text-xs text-gray-500">Showing prices for:</span>
+          <select
+            className="text-sm border-0 bg-transparent focus:outline-none font-medium text-gray-800"
+            value={selectedCode}
+            onChange={(e) => setSelectedCode(e.target.value)}
+          >
+            {countries.map((c) => (
+              <option key={c.code} value={c.code}>
+                {c.name} ({c.currency_code})
+              </option>
+            ))}
+          </select>
+        </div>
       </section>
 
       {/* Classes grid */}
-      <section className="max-w-6xl mx-auto px-4 sm:px-6 pb-16">
+      <section className="max-w-6xl mx-auto px-4 sm:px-6 pb-16 -mt-2">
         {loading ? (
           <div className="text-center py-16 text-gray-400">Loading classes…</div>
         ) : classes.length === 0 ? (

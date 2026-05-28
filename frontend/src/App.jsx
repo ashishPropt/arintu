@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import Layout from './components/Layout';
+import PublicLayout from './components/PublicLayout';
 import Login from './pages/Login';
 import Landing from './pages/Landing';
 import Dashboard from './pages/Dashboard';
@@ -12,7 +13,22 @@ import Regions from './pages/superadmin/Regions';
 import Countries from './pages/superadmin/Countries';
 import FeeWaivers from './pages/superadmin/FeeWaivers';
 import Scholarships from './pages/superadmin/Scholarships';
+import ManageTeam from './pages/superadmin/ManageTeam';
+import ManageCities from './pages/superadmin/ManageCities';
+import ManageBooks from './pages/superadmin/ManageBooks';
 import Applications from './pages/admin/Applications';
+
+// Public content pages
+import Team from './pages/public/Team';
+import AboutCities from './pages/public/AboutCities';
+import AboutCountries from './pages/public/AboutCountries';
+import HQAddress from './pages/public/HQAddress';
+import History from './pages/public/History';
+import Jobs from './pages/public/Jobs';
+import FAQ from './pages/public/FAQ';
+import BookClub from './pages/public/BookClub';
+import ArintuOnline from './pages/public/ArintuOnline';
+import EnfinittyCircle from './pages/public/EnfinittyCircle';
 
 function RequireAuth({ children, roles }) {
   const { user, loading } = useAuth();
@@ -31,8 +47,25 @@ export default function App() {
     <AuthProvider>
       <BrowserRouter>
         <Routes>
-          <Route path="/" element={<Landing />} />
+          {/* Login */}
           <Route path="/login" element={<LoginRedirect />} />
+
+          {/* Public pages — all wrapped in PublicLayout (shared header + footer) */}
+          <Route element={<PublicLayout />}>
+            <Route path="/" element={<Landing />} />
+            <Route path="/about/team"      element={<Team />} />
+            <Route path="/about/cities"    element={<AboutCities />} />
+            <Route path="/about/countries" element={<AboutCountries />} />
+            <Route path="/about/hq"        element={<HQAddress />} />
+            <Route path="/about/history"   element={<History />} />
+            <Route path="/about/jobs"      element={<Jobs />} />
+            <Route path="/about/faq"       element={<FAQ />} />
+            <Route path="/community/book-club"        element={<BookClub />} />
+            <Route path="/community/arintu-online"    element={<ArintuOnline />} />
+            <Route path="/community/enfinitty-circle" element={<EnfinittyCircle />} />
+          </Route>
+
+          {/* Authenticated app */}
           <Route path="/app" element={<RequireAuth><Layout /></RequireAuth>}>
             <Route index element={<Navigate to="/app/dashboard" replace />} />
             <Route path="dashboard" element={<Dashboard />} />
@@ -73,7 +106,23 @@ export default function App() {
                 <Scholarships />
               </RequireAuth>
             } />
+            <Route path="manage-team" element={
+              <RequireAuth roles={['superadmin']}>
+                <ManageTeam />
+              </RequireAuth>
+            } />
+            <Route path="manage-cities" element={
+              <RequireAuth roles={['superadmin']}>
+                <ManageCities />
+              </RequireAuth>
+            } />
+            <Route path="manage-books" element={
+              <RequireAuth roles={['superadmin']}>
+                <ManageBooks />
+              </RequireAuth>
+            } />
           </Route>
+
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </BrowserRouter>

@@ -99,6 +99,28 @@ export const waivers = {
 export const publicApi = {
   classes: (countryCode) => api.get('/public/classes', { params: { countryCode } }),
   applicationFee: (countryCode) => api.get('/public/application-fee', { params: { countryCode } }),
+  team: () => api.get('/public/team'),
+  cities: () => api.get('/public/cities'),
+  countries: () => api.get('/public/countries'),
+  books: () => api.get('/public/books'),
+};
+
+export const content = {
+  // Team (superadmin)
+  getTeam: () => api.get('/content/team'),
+  createTeamMember: (data) => api.post('/content/team', data),
+  updateTeamMember: (id, data) => api.put(`/content/team/${id}`, data),
+  deleteTeamMember: (id) => api.delete(`/content/team/${id}`),
+  // Cities (superadmin)
+  getCities: () => api.get('/content/cities'),
+  createCity: (data) => api.post('/content/cities', data),
+  updateCity: (id, data) => api.put(`/content/cities/${id}`, data),
+  deleteCity: (id) => api.delete(`/content/cities/${id}`),
+  // Books (superadmin + authenticated users)
+  getBooks: () => api.get('/content/books'),
+  submitBook: (data) => api.post('/content/books', data),
+  reviewBook: (id, status, notes) => api.put(`/content/books/${id}/review`, { status, admin_notes: notes }),
+  deleteBook: (id) => api.delete(`/content/books/${id}`),
 };
 
 export const pricing = {

@@ -109,4 +109,72 @@ router.get('/application-fee', async (req, res) => {
   }
 });
 
+// GET /api/public/team — active team members, ordered by display_order
+router.get('/team', async (req, res) => {
+  try {
+    const result = await db.query(
+      `SELECT id, name, title, bio, photo_url, linkedin_url, display_order
+       FROM team_members
+       WHERE is_active = TRUE
+       ORDER BY display_order ASC, created_at ASC`
+    );
+    res.json(result.rows);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// GET /api/public/cities — active cities with country info
+router.get('/cities', async (req, res) => {
+  try {
+    const result = await db.query(
+      `SELECT ci.id, ci.name, ci.description, ci.display_order,
+              co.name as country_name, co.code as country_code
+       FROM cities ci
+       LEFT JOIN countries co ON co.id = ci.country_id
+       WHERE ci.is_active = TRUE
+       ORDER BY ci.display_order ASC, ci.name ASC`
+    );
+    res.json(result.rows);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// GET /api/public/countries — all active countries
+router.get('/countries', async (req, res) => {
+  try {
+    const result = await db.query(
+      `SELECT id, name, code, currency_code, currency_symbol
+       FROM countries
+       WHERE is_active = TRUE
+       ORDER BY name ASC`
+    );
+    res.json(result.rows);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// GET /api/public/books — approved book submissions only
+router.get('/books', async (req, res) => {
+  try {
+    const result = await db.query(
+      `SELECT bs.id, bs.amazon_url, bs.title, bs.author, bs.reason, bs.created_at,
+              u.name as submitter_name
+       FROM book_submissions bs
+       JOIN users u ON u.id = bs.user_id
+       WHERE bs.status = 'approved'
+       ORDER BY bs.created_at DESC`
+    );
+    res.json(result.rows);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
 module.exports = router;

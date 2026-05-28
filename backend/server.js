@@ -22,6 +22,7 @@ app.use('/api/mathwave', require('./routes/mathwave'));
 app.use('/api/countries', require('./routes/countries'));
 app.use('/api/applications', require('./routes/applications'));
 app.use('/api/waivers', require('./routes/waivers'));
+app.use('/api/content', require('./routes/content'));
 app.use('/api/public', require('./routes/public'));
 
 app.get('/api/health', (req, res) => res.json({ status: 'ok', version: '1.0.0' }));
