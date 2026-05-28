@@ -105,8 +105,9 @@ router.get('/:id', authenticate, async (req, res) => {
 
   // Pricing
   const pricing = await db.query(
-    `SELECT cp.*, r.name as region_name FROM class_pricing cp
-     LEFT JOIN regions r ON r.id = cp.region_id
+    `SELECT cp.*, co.name as country_name, co.code as country_code, co.currency_symbol
+     FROM class_pricing cp
+     LEFT JOIN countries co ON co.id = cp.country_id
      WHERE cp.class_id = $1 ORDER BY cp.is_default DESC`,
     [req.params.id]
   );
@@ -143,18 +144,41 @@ router.delete('/:id', authenticate, authorize('admin', 'superadmin'), async (req
 
 // POST /api/classes/:id/pricing
 router.post('/:id/pricing', authenticate, authorize('admin', 'superadmin'), async (req, res) => {
-  const { regionId, price, currency, isDefault } = req.body;
+  const { countryId, price, isDefault } = req.body;
   try {
-    const result = await db.query(
-      `INSERT INTO class_pricing (class_id, region_id, price, currency, is_default)
-       VALUES ($1, $2, $3, $4, $5)
-       ON CONFLICT (class_id, region_id) DO UPDATE
-       SET price = $3, currency = $4, is_default = $5, updated_at = NOW()
-       RETURNING *`,
-      [req.params.id, regionId || null, price, currency || 'USD', isDefault || false]
-    );
+    // Look up the country's currency so price is always in local currency
+    let currency = 'USD';
+    if (countryId) {
+      const c = await db.query('SELECT currency_code FROM countries WHERE id = $1', [countryId]);
+      if (c.rows[0]) currency = c.rows[0].currency_code;
+    }
+
+    // Use raw SQL with ON CONFLICT on the partial unique indexes
+    // country_id set → use uniq_class_country_price index
+    // country_id null → use uniq_class_default_price index
+    let result;
+    if (countryId) {
+      result = await db.query(
+        `INSERT INTO class_pricing (class_id, country_id, price, currency, is_default)
+         VALUES ($1, $2, $3, $4, $5)
+         ON CONFLICT (class_id, country_id) WHERE country_id IS NOT NULL
+         DO UPDATE SET price = $3, currency = $4, is_default = $5, updated_at = NOW()
+         RETURNING *`,
+        [req.params.id, countryId, price, currency, isDefault ?? false]
+      );
+    } else {
+      result = await db.query(
+        `INSERT INTO class_pricing (class_id, country_id, price, currency, is_default)
+         VALUES ($1, NULL, $2, $3, TRUE)
+         ON CONFLICT (class_id) WHERE country_id IS NULL AND region_id IS NULL
+         DO UPDATE SET price = $2, currency = $3, is_default = TRUE, updated_at = NOW()
+         RETURNING *`,
+        [req.params.id, price, currency]
+      );
+    }
     res.json(result.rows[0]);
-  } catch {
+  } catch (err) {
+    console.error(err);
     res.status(500).json({ error: 'Server error' });
   }
 });

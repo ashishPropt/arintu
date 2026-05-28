@@ -4,28 +4,30 @@ import Logo from './Logo';
 
 const navByRole = {
   superadmin: [
-    { to: '/dashboard', label: 'Dashboard', icon: HomeIcon },
-    { to: '/users', label: 'Users', icon: UsersIcon },
-    { to: '/pricing', label: 'Pricing', icon: TagIcon },
-    { to: '/regions', label: 'Regions', icon: GlobeIcon },
-    { to: '/classes', label: 'All Classes', icon: BookIcon },
-    { to: '/schedules', label: 'Schedules', icon: CalIcon },
+    { to: '/app/dashboard', label: 'Dashboard', icon: HomeIcon },
+    { to: '/app/users', label: 'Users', icon: UsersIcon },
+    { to: '/app/countries', label: 'Countries & Fees', icon: GlobeIcon },
+    { to: '/app/pricing', label: 'Pricing', icon: TagIcon },
+    { to: '/app/classes', label: 'All Classes', icon: BookIcon },
+    { to: '/app/schedules', label: 'Schedules', icon: CalIcon },
+    { to: '/app/applications', label: 'Applications', icon: ClipboardIcon },
   ],
   admin: [
-    { to: '/dashboard', label: 'Dashboard', icon: HomeIcon },
-    { to: '/classes', label: 'Classes', icon: BookIcon },
-    { to: '/schedules', label: 'Schedules', icon: CalIcon },
-    { to: '/users', label: 'Users', icon: UsersIcon },
+    { to: '/app/dashboard', label: 'Dashboard', icon: HomeIcon },
+    { to: '/app/classes', label: 'Classes', icon: BookIcon },
+    { to: '/app/schedules', label: 'Schedules', icon: CalIcon },
+    { to: '/app/users', label: 'Users', icon: UsersIcon },
+    { to: '/app/applications', label: 'Applications', icon: ClipboardIcon },
   ],
   teacher: [
-    { to: '/dashboard', label: 'Dashboard', icon: HomeIcon },
-    { to: '/classes', label: 'My Classes', icon: BookIcon },
-    { to: '/schedules', label: 'Schedule', icon: CalIcon },
+    { to: '/app/dashboard', label: 'Dashboard', icon: HomeIcon },
+    { to: '/app/classes', label: 'My Classes', icon: BookIcon },
+    { to: '/app/schedules', label: 'Schedule', icon: CalIcon },
   ],
   student: [
-    { to: '/dashboard', label: 'Dashboard', icon: HomeIcon },
-    { to: '/classes', label: 'My Classes', icon: BookIcon },
-    { to: '/schedules', label: 'Schedule', icon: CalIcon },
+    { to: '/app/dashboard', label: 'Dashboard', icon: HomeIcon },
+    { to: '/app/classes', label: 'My Classes', icon: BookIcon },
+    { to: '/app/schedules', label: 'Schedule', icon: CalIcon },
   ],
 };
 
@@ -131,6 +133,14 @@ function LogoutIcon({ className }) {
   return (
     <svg className={className} viewBox="0 0 20 20" fill="currentColor">
       <path fillRule="evenodd" d="M3 3a1 1 0 00-1 1v12a1 1 0 102 0V4a1 1 0 00-1-1zm10.293 9.293a1 1 0 001.414 1.414l3-3a1 1 0 000-1.414l-3-3a1 1 0 10-1.414 1.414L14.586 9H7a1 1 0 100 2h7.586l-1.293 1.293z" clipRule="evenodd"/>
+    </svg>
+  );
+}
+function ClipboardIcon({ className }) {
+  return (
+    <svg className={className} viewBox="0 0 20 20" fill="currentColor">
+      <path d="M8 3a1 1 0 011-1h2a1 1 0 110 2H9a1 1 0 01-1-1z"/>
+      <path d="M6 3a2 2 0 00-2 2v11a2 2 0 002 2h8a2 2 0 002-2V5a2 2 0 00-2-2 3 3 0 01-3 3H9a3 3 0 01-3-3z"/>
     </svg>
   );
 }

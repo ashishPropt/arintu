@@ -24,11 +24,11 @@ export default function SuperAdminDashboard() {
   }, []);
 
   const cards = [
-    { label: 'Admins', value: stats.admins, color: 'text-blue-600 bg-blue-50', link: '/users?role=admin' },
-    { label: 'Teachers', value: stats.teachers, color: 'text-green-600 bg-green-50', link: '/users?role=teacher' },
-    { label: 'Students', value: stats.students, color: 'text-orange-600 bg-orange-50', link: '/users?role=student' },
-    { label: 'Classes', value: stats.classes, color: 'text-purple-600 bg-purple-50', link: '/classes' },
-    { label: 'Pricing Tiers', value: stats.tiers, color: 'text-pink-600 bg-pink-50', link: '/pricing' },
+    { label: 'Admins', value: stats.admins, color: 'text-blue-600 bg-blue-50', link: '/app/users?role=admin' },
+    { label: 'Teachers', value: stats.teachers, color: 'text-green-600 bg-green-50', link: '/app/users?role=teacher' },
+    { label: 'Students', value: stats.students, color: 'text-orange-600 bg-orange-50', link: '/app/users?role=student' },
+    { label: 'Classes', value: stats.classes, color: 'text-purple-600 bg-purple-50', link: '/app/classes' },
+    { label: 'Pricing Tiers', value: stats.tiers, color: 'text-pink-600 bg-pink-50', link: '/app/pricing' },
   ];
 
   return (
@@ -49,17 +49,17 @@ export default function SuperAdminDashboard() {
         <div className="card p-5">
           <h2 className="text-sm font-semibold mb-3">Quick Actions</h2>
           <div className="space-y-2">
-            <Link to="/users" className="flex items-center gap-2 p-2.5 rounded-lg hover:bg-gray-50 text-sm text-gray-700">
+            <Link to="/app/users" className="flex items-center gap-2 p-2.5 rounded-lg hover:bg-gray-50 text-sm text-gray-700">
               <span className="w-7 h-7 bg-blue-50 text-blue-600 rounded-lg flex items-center justify-center text-xs font-bold">+</span>
               Add Admin / Teacher
             </Link>
-            <Link to="/pricing" className="flex items-center gap-2 p-2.5 rounded-lg hover:bg-gray-50 text-sm text-gray-700">
+            <Link to="/app/pricing" className="flex items-center gap-2 p-2.5 rounded-lg hover:bg-gray-50 text-sm text-gray-700">
               <span className="w-7 h-7 bg-pink-50 text-pink-600 rounded-lg flex items-center justify-center text-xs font-bold">$</span>
               Manage Pricing Tiers
             </Link>
-            <Link to="/regions" className="flex items-center gap-2 p-2.5 rounded-lg hover:bg-gray-50 text-sm text-gray-700">
+            <Link to="/app/countries" className="flex items-center gap-2 p-2.5 rounded-lg hover:bg-gray-50 text-sm text-gray-700">
               <span className="w-7 h-7 bg-green-50 text-green-600 rounded-lg flex items-center justify-center text-xs font-bold">🌍</span>
-              Manage Regions
+              Countries &amp; Fees
             </Link>
           </div>
         </div>

@@ -29,7 +29,7 @@ export default function StudentDashboard() {
           </div>
           <div>
             <p className="text-xs text-gray-500">Enrolled Classes</p>
-            <Link to="/classes" className="text-sm font-semibold text-gray-900 hover:text-brand-600">View classes</Link>
+            <Link to="/app/classes" className="text-sm font-semibold text-gray-900 hover:text-brand-600">View classes</Link>
           </div>
         </div>
         <div className="card p-4 flex items-center gap-3">
@@ -38,7 +38,7 @@ export default function StudentDashboard() {
           </div>
           <div>
             <p className="text-xs text-gray-500">Upcoming Sessions</p>
-            <Link to="/schedules" className="text-sm font-semibold text-gray-900 hover:text-brand-600">View schedule</Link>
+            <Link to="/app/schedules" className="text-sm font-semibold text-gray-900 hover:text-brand-600">View schedule</Link>
           </div>
         </div>
       </div>

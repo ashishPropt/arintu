@@ -19,6 +19,9 @@ app.use('/api/notifications', require('./routes/notifications'));
 app.use('/api/regions', require('./routes/regions'));
 app.use('/api/pricing', require('./routes/pricing'));
 app.use('/api/mathwave', require('./routes/mathwave'));
+app.use('/api/countries', require('./routes/countries'));
+app.use('/api/applications', require('./routes/applications'));
+app.use('/api/public', require('./routes/public'));
 
 app.get('/api/health', (req, res) => res.json({ status: 'ok', version: '1.0.0' }));
 

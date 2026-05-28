@@ -16,8 +16,14 @@ export default function Login() {
     setError('');
     setLoading(true);
     try {
-      const user = await login(email, password);
-      navigate('/dashboard');
+      await login(email, password);
+      // If student was redirected from landing page to apply, go back there
+      const pendingClass = sessionStorage.getItem('applyClassId');
+      if (pendingClass) {
+        navigate('/');
+      } else {
+        navigate('/app/dashboard');
+      }
     } catch (err) {
       setError(err.response?.data?.error || 'Login failed');
     } finally {

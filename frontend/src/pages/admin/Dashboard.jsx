@@ -25,16 +25,16 @@ export default function AdminDashboard() {
       <p className="text-sm text-gray-500 mb-6">Manage your classes and users</p>
 
       <div className="grid grid-cols-3 gap-4 mb-8">
-        <StatCard label="Classes" value={stats.classes} link="/classes" color="brand" />
-        <StatCard label="Teachers" value={stats.teachers} link="/users?role=teacher" color="green" />
-        <StatCard label="Students" value={stats.students} link="/users?role=student" color="orange" />
+        <StatCard label="Classes" value={stats.classes} link="/app/classes" color="brand" />
+        <StatCard label="Teachers" value={stats.teachers} link="/app/users?role=teacher" color="green" />
+        <StatCard label="Students" value={stats.students} link="/app/users?role=student" color="orange" />
       </div>
 
       <div className="grid md:grid-cols-2 gap-4">
         <div className="card p-5">
           <div className="flex items-center justify-between mb-3">
             <h2 className="text-sm font-semibold">Upcoming Sessions</h2>
-            <Link to="/schedules" className="text-xs text-brand-600 hover:underline">View all</Link>
+            <Link to="/app/schedules" className="text-xs text-brand-600 hover:underline">View all</Link>
           </div>
           {upcoming.length === 0 ? (
             <p className="text-sm text-gray-400 text-center py-4">No upcoming sessions</p>
@@ -60,15 +60,15 @@ export default function AdminDashboard() {
         <div className="card p-5">
           <h2 className="text-sm font-semibold mb-3">Quick Actions</h2>
           <div className="space-y-2">
-            <Link to="/classes" className="flex items-center gap-2 p-2.5 rounded-lg hover:bg-gray-50 text-sm text-gray-700">
+            <Link to="/app/classes" className="flex items-center gap-2 p-2.5 rounded-lg hover:bg-gray-50 text-sm text-gray-700">
               <span className="w-7 h-7 bg-brand-50 text-brand-600 rounded-lg flex items-center justify-center font-bold">+</span>
               Create new class
             </Link>
-            <Link to="/schedules" className="flex items-center gap-2 p-2.5 rounded-lg hover:bg-gray-50 text-sm text-gray-700">
+            <Link to="/app/schedules" className="flex items-center gap-2 p-2.5 rounded-lg hover:bg-gray-50 text-sm text-gray-700">
               <span className="w-7 h-7 bg-green-50 text-green-600 rounded-lg flex items-center justify-center font-bold">📅</span>
               Schedule a session
             </Link>
-            <Link to="/users" className="flex items-center gap-2 p-2.5 rounded-lg hover:bg-gray-50 text-sm text-gray-700">
+            <Link to="/app/users" className="flex items-center gap-2 p-2.5 rounded-lg hover:bg-gray-50 text-sm text-gray-700">
               <span className="w-7 h-7 bg-orange-50 text-orange-600 rounded-lg flex items-center justify-center font-bold">👤</span>
               Add teacher or student
             </Link>

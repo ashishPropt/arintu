@@ -70,6 +70,26 @@ export const regions = {
   remove: (id) => api.delete(`/regions/${id}`),
 };
 
+export const countries = {
+  list: () => api.get('/countries'),
+  create: (data) => api.post('/countries', data),
+  remove: (id) => api.delete(`/countries/${id}`),
+  fees: () => api.get('/countries/fees'),
+  setFee: (countryId, fee) => api.put(`/countries/fees/${countryId}`, { fee }),
+};
+
+export const applications = {
+  list: (params) => api.get('/applications', { params }),
+  apply: (classId, countryCode) => api.post('/applications', { classId, countryCode }),
+  approve: (id) => api.put(`/applications/${id}/approve`),
+  reject: (id, notes) => api.put(`/applications/${id}/reject`, { notes }),
+};
+
+export const publicApi = {
+  classes: (countryCode) => api.get('/public/classes', { params: { countryCode } }),
+  applicationFee: (countryCode) => api.get('/public/application-fee', { params: { countryCode } }),
+};
+
 export const pricing = {
   list: () => api.get('/pricing'),
   create: (data) => api.post('/pricing', data),

@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { classes as classesApi, users, regions as regionsApi } from '../api';
+import { classes as classesApi, users, countries as countriesApi } from '../api';
 import { useAuth } from '../contexts/AuthContext';
 import Modal from '../components/Modal';
 import { Link } from 'react-router-dom';
@@ -32,7 +32,7 @@ export default function Classes() {
       Promise.all([
         users.list({ role: 'teacher', limit: 100 }),
         users.list({ role: 'student', limit: 100 }),
-        regionsApi.list(),
+        countriesApi.list(),
       ]).then(([t, s, r]) => {
         setTeachers(t.data.users || []);
         setStudents(s.data.users || []);
@@ -103,7 +103,7 @@ export default function Classes() {
         <CreateClassModal
           onClose={() => setShowCreate(false)}
           onCreated={() => { setShowCreate(false); load(); }}
-          regions={regions}
+          countries={regions}
         />
       )}
 
@@ -114,7 +114,7 @@ export default function Classes() {
           onChanged={load}
           teachers={teachers}
           students={students}
-          regions={regions}
+          countries={regions}
           isAdmin={isAdmin}
         />
       )}
@@ -122,13 +122,20 @@ export default function Classes() {
   );
 }
 
-function CreateClassModal({ onClose, onCreated, regions }) {
+function CreateClassModal({ onClose, onCreated, countries }) {
   const [form, setForm] = useState({ name: '', description: '', subject: '', level: '', maxStudents: 30 });
-  const [pricing, setPricing] = useState([{ regionId: null, price: '', isDefault: true }]);
+  const [pricing, setPricing] = useState([{ countryId: null, price: '', isDefault: true }]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
+
+  // Find currency symbol for a country id
+  const currencyFor = (countryId) => {
+    if (!countryId) return '';
+    const c = countries.find((c) => c.id === countryId);
+    return c ? `${c.currency_symbol} (${c.currency_code})` : '';
+  };
 
   const submit = async (e) => {
     e.preventDefault();
@@ -136,7 +143,7 @@ function CreateClassModal({ onClose, onCreated, regions }) {
     try {
       const res = await classesApi.create(form);
       for (const p of pricing.filter((x) => x.price)) {
-        await classesApi.setPricing(res.data.id, { regionId: p.regionId || undefined, price: parseFloat(p.price), isDefault: p.isDefault });
+        await classesApi.setPricing(res.data.id, { countryId: p.countryId || undefined, price: parseFloat(p.price) });
       }
       onCreated();
     } catch (err) {
@@ -173,21 +180,30 @@ function CreateClassModal({ onClose, onCreated, regions }) {
 
         <div>
           <div className="flex items-center justify-between mb-2">
-            <label className="text-xs font-medium text-gray-700">Pricing</label>
-            <button type="button" onClick={() => setPricing((p) => [...p, { regionId: null, price: '', isDefault: false }])}
-              className="text-xs text-brand-600 hover:underline">+ Add region price</button>
+            <label className="text-xs font-medium text-gray-700">Pricing per Country</label>
+            <button type="button" onClick={() => setPricing((p) => [...p, { countryId: null, price: '', isDefault: false }])}
+              className="text-xs text-brand-600 hover:underline">+ Add country price</button>
           </div>
           {pricing.map((p, i) => (
             <div key={i} className="flex gap-2 mb-2 items-center">
-              <select className="input text-sm" value={p.regionId || ''} onChange={(e) => setPricing((arr) => arr.map((x, j) => j === i ? { ...x, regionId: e.target.value || null } : x))}>
-                <option value="">Global (default)</option>
-                {regions.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
+              <select className="input text-sm flex-1" value={p.countryId || ''}
+                onChange={(e) => setPricing((arr) => arr.map((x, j) => j === i ? { ...x, countryId: e.target.value || null } : x))}>
+                <option value="">Default (all countries)</option>
+                {countries.map((c) => <option key={c.id} value={c.id}>{c.name} ({c.currency_symbol} {c.currency_code})</option>)}
               </select>
-              <input type="number" className="input w-28" placeholder="Price" value={p.price}
-                onChange={(e) => setPricing((arr) => arr.map((x, j) => j === i ? { ...x, price: e.target.value } : x))} />
+              <div className="relative">
+                {p.countryId && (
+                  <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs text-gray-400 pointer-events-none">
+                    {countries.find((c) => c.id === p.countryId)?.currency_symbol}
+                  </span>
+                )}
+                <input type="number" className={`input w-28 ${p.countryId ? 'pl-6' : ''}`} placeholder="Price" value={p.price}
+                  onChange={(e) => setPricing((arr) => arr.map((x, j) => j === i ? { ...x, price: e.target.value } : x))} />
+              </div>
               {i > 0 && <button type="button" onClick={() => setPricing((arr) => arr.filter((_, j) => j !== i))} className="text-gray-400 hover:text-red-500 text-sm">✕</button>}
             </div>
           ))}
+          <p className="text-xs text-gray-400 mt-1">Prices are in the local currency of each country.</p>
         </div>
 
         <div className="flex justify-end gap-2 pt-2">
@@ -199,7 +215,7 @@ function CreateClassModal({ onClose, onCreated, regions }) {
   );
 }
 
-function ClassDetailModal({ classId, onClose, onChanged, teachers, students, regions, isAdmin }) {
+function ClassDetailModal({ classId, onClose, onChanged, teachers, students, countries, isAdmin }) {
   const [data, setData] = useState(null);
   const [enrollments, setEnrollments] = useState([]);
   const [tab, setTab] = useState('info');
