@@ -163,9 +163,18 @@ router.post('/:id/pricing', authenticate, authorize('admin', 'superadmin'), asyn
 router.post('/:id/assign-teacher', authenticate, authorize('admin', 'superadmin'), async (req, res) => {
   const { teacherId } = req.body;
   try {
+    // Only one teacher allowed per class
+    const existing = await db.query(
+      'SELECT teacher_id FROM teacher_assignments WHERE class_id = $1',
+      [req.params.id]
+    );
+    if (existing.rows.length > 0) {
+      return res.status(400).json({ error: 'A teacher is already assigned. Remove the current teacher first.' });
+    }
+
     await db.query(
       `INSERT INTO teacher_assignments (class_id, teacher_id, assigned_by)
-       VALUES ($1, $2, $3) ON CONFLICT DO NOTHING`,
+       VALUES ($1, $2, $3)`,
       [req.params.id, teacherId, req.user.id]
     );
 

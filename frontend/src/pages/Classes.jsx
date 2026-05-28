@@ -258,7 +258,7 @@ function ClassDetailModal({ classId, onClose, onChanged, teachers, students, reg
 
       {tab === 'teachers' && (
         <div>
-          {isAdmin && (
+          {isAdmin && (data.teachers || []).length === 0 && (
             <div className="flex gap-2 mb-3">
               <select className="input flex-1 text-sm" value={selectedTeacher} onChange={(e) => setSelectedTeacher(e.target.value)}>
                 <option value="">Select teacher…</option>
@@ -267,9 +267,14 @@ function ClassDetailModal({ classId, onClose, onChanged, teachers, students, reg
               <button onClick={assignTeacher} disabled={!selectedTeacher} className="btn-primary text-sm">Assign</button>
             </div>
           )}
+          {isAdmin && (data.teachers || []).length > 0 && (
+            <p className="text-xs text-amber-600 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2 mb-3">
+              Remove the current teacher before assigning a new one.
+            </p>
+          )}
           <div className="space-y-2">
             {(data.teachers || []).length === 0 ? (
-              <p className="text-sm text-gray-400 text-center py-3">No teachers assigned</p>
+              <p className="text-sm text-gray-400 text-center py-3">No teacher assigned yet</p>
             ) : (data.teachers || []).map((t) => (
               <div key={t.id} className="flex items-center justify-between p-2 rounded-lg hover:bg-gray-50">
                 <div>
