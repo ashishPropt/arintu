@@ -38,7 +38,11 @@ export default function Schedules() {
   const [week, setWeek] = useState(startOfWeek(new Date(), { weekStartsOn: 1 }));
   const [showCreate, setShowCreate] = useState(false);
   const [myClasses, setMyClasses] = useState([]);
-  const isAdmin = ['admin', 'superadmin'].includes(user?.role);
+
+  // Admins + teachers can create sessions; admins also get the delete button
+  const canCreateSchedule = ['admin', 'superadmin', 'teacher'].includes(user?.role);
+  const canCreateZoom     = ['admin', 'superadmin', 'teacher'].includes(user?.role);
+  const isAdmin           = ['admin', 'superadmin'].includes(user?.role);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -53,8 +57,8 @@ export default function Schedules() {
   useEffect(() => { load(); }, [load]);
 
   useEffect(() => {
-    if (isAdmin) classesApi.list({ limit: 100 }).then((r) => setMyClasses(r.data.classes || [])).catch(() => {});
-  }, [isAdmin]);
+    if (canCreateSchedule) classesApi.list({ limit: 100 }).then((r) => setMyClasses(r.data.classes || [])).catch(() => {});
+  }, [canCreateSchedule]);
 
   const weekDays = Array.from({ length: 7 }, (_, i) => addDays(week, i));
 
@@ -83,7 +87,7 @@ export default function Schedules() {
           <button onClick={() => setWeek((w) => addDays(w, -7))} className="btn-secondary px-3">←</button>
           <button onClick={() => setWeek(startOfWeek(new Date(), { weekStartsOn: 1 }))} className="btn-secondary px-3 text-xs">Today</button>
           <button onClick={() => setWeek((w) => addDays(w, 7))} className="btn-secondary px-3">→</button>
-          {isAdmin && <button onClick={() => setShowCreate(true)} className="btn-primary">+ Schedule</button>}
+          {canCreateSchedule && <button onClick={() => setShowCreate(true)} className="btn-primary">+ Schedule</button>}
         </div>
       </div>
 
@@ -104,7 +108,7 @@ export default function Schedules() {
             return (
               <div key={day.toISOString()} className="p-2 border-r border-gray-50 last:border-r-0 space-y-1 min-h-48">
                 {dayItems.map((s) => (
-                  <ScheduleCard key={s.id} schedule={s} isAdmin={isAdmin} onCreateZoom={createZoom} onDeleted={load} />
+                  <ScheduleCard key={s.id} schedule={s} isAdmin={isAdmin} canCreateZoom={canCreateZoom} onCreateZoom={createZoom} onDeleted={load} />
                 ))}
               </div>
             );
@@ -123,7 +127,7 @@ export default function Schedules() {
   );
 }
 
-function ScheduleCard({ schedule: s, isAdmin, onCreateZoom, onDeleted }) {
+function ScheduleCard({ schedule: s, isAdmin, canCreateZoom, onCreateZoom, onDeleted }) {
   return (
     <div className="bg-brand-50 border border-brand-100 rounded-lg p-2 text-xs group">
       <p className="font-semibold text-brand-900 truncate">{s.class_name}</p>
@@ -135,7 +139,7 @@ function ScheduleCard({ schedule: s, isAdmin, onCreateZoom, onDeleted }) {
             className="px-1.5 py-0.5 bg-purple-100 text-purple-700 rounded font-medium hover:bg-purple-200">
             Join Zoom
           </a>
-        ) : isAdmin ? (
+        ) : canCreateZoom ? (
           <button onClick={() => onCreateZoom(s.id)}
             className="px-1.5 py-0.5 bg-white border border-gray-200 text-gray-600 rounded hover:bg-purple-50 hover:text-purple-600 hover:border-purple-200">
             + Zoom

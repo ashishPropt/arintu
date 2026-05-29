@@ -149,7 +149,6 @@ router.get('/countries', async (req, res) => {
     const result = await db.query(
       `SELECT id, name, code, currency_code, currency_symbol
        FROM countries
-       WHERE is_active = TRUE
        ORDER BY name ASC`
     );
     res.json(result.rows);

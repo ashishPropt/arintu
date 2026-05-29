@@ -19,7 +19,7 @@ function getTransporter() {
   });
 }
 
-const SUPPORT_EMAIL = 'infoenfinitty@gmail.com';
+const SUPPORT_EMAIL = 'admin@enfinitty.com';
 
 function getFrom() {
   const user = process.env.SMTP_USER;

@@ -7,17 +7,23 @@ import Modal from '../../components/Modal';
 
 export default function StudentDashboard() {
   const { user, reload: reloadUser } = useAuth();
-  const [myClasses, setMyClasses] = useState([]);
+  const [enrolledCount, setEnrolledCount] = useState(0);
+  const [totalSchedules, setTotalSchedules] = useState(0);
   const [upcoming, setUpcoming] = useState([]);
   const [showWaiverModal, setShowWaiverModal] = useState(false);
 
   useEffect(() => {
     Promise.all([
-      classes.list({ limit: 5 }),
+      // enrolledOnly=true gives accurate count of actually enrolled classes
+      classes.list({ enrolledOnly: true, limit: 200 }),
+      // Fetch all upcoming — use count for badge, slice for display
       schedules.list({ from: new Date().toISOString() }),
     ]).then(([cls, sched]) => {
-      setMyClasses(cls.data.classes || []);
-      setUpcoming((sched.data || []).slice(0, 5));
+      const enrolled = cls.data.classes || [];
+      const allUpcoming = sched.data || [];
+      setEnrolledCount(enrolled.length);
+      setTotalSchedules(allUpcoming.length);
+      setUpcoming(allUpcoming.slice(0, 5));
     }).catch(() => {});
   }, []);
 
@@ -41,7 +47,7 @@ export default function StudentDashboard() {
       <div className="grid md:grid-cols-2 gap-4 mb-4">
         <div className="card p-4 flex items-center gap-3">
           <div className="w-10 h-10 bg-brand-50 text-brand-600 rounded-xl flex items-center justify-center font-bold text-lg">
-            {myClasses.length}
+            {enrolledCount}
           </div>
           <div>
             <p className="text-xs text-gray-500">Enrolled Classes</p>
@@ -50,7 +56,7 @@ export default function StudentDashboard() {
         </div>
         <div className="card p-4 flex items-center gap-3">
           <div className="w-10 h-10 bg-green-50 text-green-600 rounded-xl flex items-center justify-center font-bold text-lg">
-            {upcoming.length}
+            {totalSchedules}
           </div>
           <div>
             <p className="text-xs text-gray-500">Upcoming Sessions</p>

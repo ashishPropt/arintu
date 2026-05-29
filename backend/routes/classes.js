@@ -13,18 +13,26 @@ router.get('/', authenticate, async (req, res) => {
   const { id: userId, role } = req.user;
 
   try {
-    let query, params;
+    let query, params, countQuery, countParams;
     if (role === 'student') {
+      const enrolledOnly = req.query.enrolledOnly === 'true';
+      const enrolledFilter = enrolledOnly ? 'AND en.class_id IS NOT NULL' : '';
       query = `
         SELECT c.*, u.name as admin_name, cp.price, cp.currency,
+               (en.class_id IS NOT NULL) as is_enrolled,
                (SELECT COUNT(*) FROM enrollments e WHERE e.class_id = c.id) as enrolled_count
         FROM classes c
         JOIN users u ON u.id = c.admin_id
         LEFT JOIN enrollments en ON en.class_id = c.id AND en.student_id = $1
         LEFT JOIN class_pricing cp ON cp.class_id = c.id AND cp.is_default = TRUE
-        WHERE c.is_active = TRUE ${search ? `AND c.name ILIKE $2` : ''}
+        WHERE c.is_active = TRUE ${enrolledFilter} ${search ? `AND c.name ILIKE $2` : ''}
         ORDER BY c.created_at DESC LIMIT ${search ? '$3' : '$2'} OFFSET ${search ? '$4' : '$3'}`;
       params = search ? [userId, `%${search}%`, limit, offset] : [userId, limit, offset];
+      countQuery = `
+        SELECT COUNT(*) FROM classes c
+        LEFT JOIN enrollments en ON en.class_id = c.id AND en.student_id = $1
+        WHERE c.is_active = TRUE ${enrolledFilter} ${search ? `AND c.name ILIKE $2` : ''}`;
+      countParams = search ? [userId, `%${search}%`] : [userId];
     } else if (role === 'teacher') {
       query = `
         SELECT c.*, u.name as admin_name,
@@ -35,6 +43,11 @@ router.get('/', authenticate, async (req, res) => {
         WHERE c.is_active = TRUE ${search ? `AND c.name ILIKE $2` : ''}
         ORDER BY c.created_at DESC LIMIT ${search ? '$3' : '$2'} OFFSET ${search ? '$4' : '$3'}`;
       params = search ? [userId, `%${search}%`, limit, offset] : [userId, limit, offset];
+      countQuery = `
+        SELECT COUNT(*) FROM classes c
+        JOIN teacher_assignments ta ON ta.class_id = c.id AND ta.teacher_id = $1
+        WHERE c.is_active = TRUE ${search ? `AND c.name ILIKE $2` : ''}`;
+      countParams = search ? [userId, `%${search}%`] : [userId];
     } else if (role === 'admin') {
       query = `
         SELECT c.*, u.name as admin_name,
@@ -44,6 +57,8 @@ router.get('/', authenticate, async (req, res) => {
         WHERE c.admin_id = $1 ${search ? `AND c.name ILIKE $2` : ''}
         ORDER BY c.created_at DESC LIMIT ${search ? '$3' : '$2'} OFFSET ${search ? '$4' : '$3'}`;
       params = search ? [userId, `%${search}%`, limit, offset] : [userId, limit, offset];
+      countQuery = `SELECT COUNT(*) FROM classes WHERE admin_id = $1 ${search ? `AND name ILIKE $2` : ''}`;
+      countParams = search ? [userId, `%${search}%`] : [userId];
     } else {
       // superadmin sees all
       query = `
@@ -54,10 +69,15 @@ router.get('/', authenticate, async (req, res) => {
         ${search ? `WHERE c.name ILIKE $1` : ''}
         ORDER BY c.created_at DESC LIMIT ${search ? '$2' : '$1'} OFFSET ${search ? '$3' : '$2'}`;
       params = search ? [`%${search}%`, limit, offset] : [limit, offset];
+      countQuery = `SELECT COUNT(*) FROM classes ${search ? `WHERE name ILIKE $1` : ''}`;
+      countParams = search ? [`%${search}%`] : [];
     }
 
-    const result = await db.query(query, params);
-    res.json({ classes: result.rows, total: result.rows.length });
+    const [result, countResult] = await Promise.all([
+      db.query(query, params),
+      db.query(countQuery, countParams),
+    ]);
+    res.json({ classes: result.rows, total: parseInt(countResult.rows[0].count) });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Server error' });

@@ -87,7 +87,7 @@ router.get('/', authenticate, async (req, res) => {
 router.post(
   '/',
   authenticate,
-  authorize('admin', 'superadmin'),
+  authorize('admin', 'superadmin', 'teacher'),
   [
     body('classId').notEmpty(),
     body('startTime').isISO8601(),
@@ -199,13 +199,24 @@ router.delete('/:id', authenticate, authorize('admin', 'superadmin'), async (req
 });
 
 // POST /api/schedules/:id/zoom
-router.post('/:id/zoom', authenticate, authorize('admin', 'superadmin'), async (req, res) => {
+router.post('/:id/zoom', authenticate, authorize('admin', 'superadmin', 'teacher'), async (req, res) => {
   const schedule = await db.query(
-    `SELECT cs.*, c.name as class_name FROM class_schedules cs
+    `SELECT cs.*, c.name as class_name, c.id as class_id_check FROM class_schedules cs
      JOIN classes c ON c.id = cs.class_id WHERE cs.id = $1`,
     [req.params.id]
   );
   if (!schedule.rows[0]) return res.status(404).json({ error: 'Schedule not found' });
+
+  // Teachers may only create zoom for their own assigned classes
+  if (req.user.role === 'teacher') {
+    const assigned = await db.query(
+      'SELECT 1 FROM teacher_assignments WHERE class_id = $1 AND teacher_id = $2',
+      [schedule.rows[0].class_id, req.user.id]
+    );
+    if (!assigned.rows[0]) {
+      return res.status(403).json({ error: 'You are not assigned to this class' });
+    }
+  }
 
   const s = schedule.rows[0];
   try {

@@ -66,7 +66,7 @@ export default function App() {
 
           {/* Public pages — wrapped in PublicLayout (shared header + footer) */}
           <Route element={<PublicLayout />}>
-            <Route path="/" element={<Landing />} />
+            <Route path="/" element={<SmartLanding />} />
             <Route path="/about/team"      element={<Team />} />
             <Route path="/about/cities"    element={<AboutCities />} />
             <Route path="/about/countries" element={<AboutCountries />} />
@@ -165,4 +165,14 @@ function LoginRedirect() {
   if (loading) return null;
   if (user) return <Navigate to="/app/dashboard" replace />;
   return <Login />;
+}
+
+// Admins and superadmins have no use for the public landing page — send them straight to their dashboard.
+function SmartLanding() {
+  const { user, loading } = useAuth();
+  if (loading) return null;
+  if (user && ['admin', 'superadmin'].includes(user.role)) {
+    return <Navigate to="/app/dashboard" replace />;
+  }
+  return <Landing />;
 }

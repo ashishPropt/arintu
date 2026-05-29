@@ -5,66 +5,91 @@ const { createNotification, notifyClassMembers } = require('../services/notifica
 
 const router = express.Router();
 
-// ── Stripe (optional) ─────────────────────────────────────────────────────────
-// Set STRIPE_SECRET_KEY in .env to enable payment collection at application time.
-// Without it, applications are accepted and flagged as 'stripe_pending' so admins
-// can still process them manually until Stripe is configured.
+// ── Stripe helper ─────────────────────────────────────────────────────────────
 function getStripe() {
   const key = process.env.STRIPE_SECRET_KEY;
   if (!key || key === 'sk_test_YOUR_STRIPE_SECRET_KEY_HERE') return null;
   try { return require('stripe')(key, { apiVersion: '2024-06-20' }); }
   catch { return null; }
 }
-// ─────────────────────────────────────────────────────────────────────────────
 
-// POST /api/applications  — student submits an application
+const STRIPE_CURRENCIES = ['usd', 'eur', 'gbp', 'cad', 'aud', 'sgd', 'inr', 'mxn'];
+function stripeCurrency(code) {
+  return STRIPE_CURRENCIES.includes((code || '').toLowerCase())
+    ? code.toLowerCase() : 'usd';
+}
+
+async function createStripeSession({ stripe, email, amount, currency, name, desc, metadata, frontendUrl, applicationId }) {
+  const session = await stripe.checkout.sessions.create({
+    mode: 'payment',
+    customer_email: email,
+    line_items: [{
+      price_data: {
+        currency: stripeCurrency(currency),
+        product_data: { name, description: desc },
+        unit_amount: Math.round(amount * 100),
+      },
+      quantity: 1,
+    }],
+    metadata,
+    success_url: `${frontendUrl}/payment/success?session_id={CHECKOUT_SESSION_ID}`,
+    cancel_url:  `${frontendUrl}/payment/cancel?app_id=${applicationId}`,
+  });
+  return session;
+}
+
+// ── POST /api/applications  ── student submits an application ─────────────────
+// Phase 1: application fee (first-time students only)
+// Phase 2: class tuition fee (all students after app fee is settled)
 router.post('/', authenticate, authorize('student'), async (req, res) => {
-  const { classId, countryCode, scholarshipRequested, scholarshipType } = req.body;
+  const { classId, countryCode } = req.body;
   const studentId = req.user.id;
 
   try {
-    // Load student record for validation
-    const waiver = await db.query(
+    // ── 1. ID verification check ──────────────────────────────────────────────
+    const userRes = await db.query(
       'SELECT fee_waiver_status, verification_status FROM users WHERE id = $1',
       [studentId]
     );
-
-    // Block if ID not verified
-    const verStatus = waiver.rows[0]?.verification_status;
+    const verStatus = userRes.rows[0]?.verification_status;
     if (verStatus !== 'approved') {
       const code = verStatus === 'pending' ? 'VERIFICATION_PENDING'
                  : verStatus === 'rejected' ? 'VERIFICATION_REJECTED'
                  : 'VERIFICATION_REQUIRED';
       const msg = verStatus === 'pending'
-        ? 'Your ID verification is pending admin review. You can apply once it is approved.'
+        ? 'Your ID verification is pending review. Please wait for admin approval.'
         : verStatus === 'rejected'
-        ? 'Your ID verification was not approved. Please re-upload your ID document from the dashboard.'
-        : 'You must upload and verify your ID before applying to classes. Please go to your dashboard to submit your ID document.';
+        ? 'Your ID verification was rejected. Re-upload your document from the dashboard.'
+        : 'You must verify your ID before enrolling. Go to your dashboard to upload.';
       return res.status(403).json({ error: msg, code });
     }
 
-    // Block students with a pending fee waiver request
-    if (waiver.rows[0]?.fee_waiver_status === 'pending') {
+    const feeWaiverStatus = userRes.rows[0]?.fee_waiver_status;
+
+    // ── 2. Waiver-pending blocks all enrollment ───────────────────────────────
+    if (feeWaiverStatus === 'pending') {
       return res.status(403).json({
-        error: 'Your fee waiver request is pending super admin review. You cannot apply until it is processed.',
+        error: 'Your application fee waiver is pending super admin review. You cannot enroll until a decision is made.',
         code: 'WAIVER_PENDING',
       });
     }
 
-    // Check class exists and is active
+    // ── 3. Class exists and is active ─────────────────────────────────────────
     const cls = await db.query('SELECT * FROM classes WHERE id = $1 AND is_active = TRUE', [classId]);
-    if (!cls.rows[0]) return res.status(404).json({ error: 'Class not found' });
+    if (!cls.rows[0]) return res.status(404).json({ error: 'Class not found or inactive' });
 
-    // Check not already applied or enrolled (ignore abandoned failed/pending_payment records)
+    // ── 4. No duplicate application ───────────────────────────────────────────
     const existing = await db.query(
-      `SELECT id, status, payment_status FROM class_applications
+      `SELECT id, status, payment_status, class_fee_status
+       FROM class_applications
        WHERE class_id = $1 AND student_id = $2
-         AND (payment_status IS NULL OR payment_status NOT IN ('failed', 'pending_payment'))`,
+         AND payment_status NOT IN ('failed')`,
       [classId, studentId]
     );
     if (existing.rows[0]) {
       return res.status(409).json({ error: 'You have already applied to this class.', existing: existing.rows[0] });
     }
+
     const enrolled = await db.query(
       'SELECT id FROM enrollments WHERE class_id = $1 AND student_id = $2',
       [classId, studentId]
@@ -73,130 +98,149 @@ router.post('/', authenticate, authorize('student'), async (req, res) => {
       return res.status(409).json({ error: 'You are already enrolled in this class.' });
     }
 
-    // Determine if application fee applies
-    // Fee waived if: super admin approved a waiver, OR student is already enrolled elsewhere
-    const prevApproved = await db.query(
-      `SELECT COUNT(*) FROM class_applications
-       WHERE student_id = $1 AND status = 'approved' AND class_id != $2`,
-      [studentId, classId]
-    );
-    const alreadyEnrolledElsewhere = await db.query(
+    // ── 5. Is first-time student? ─────────────────────────────────────────────
+    const enrollCount = await db.query(
       'SELECT COUNT(*) FROM enrollments WHERE student_id = $1',
       [studentId]
     );
-    const feeWaived =
-      waiver.rows[0]?.fee_waiver_status === 'approved' ||
-      parseInt(prevApproved.rows[0].count) > 0 ||
-      parseInt(alreadyEnrolledElsewhere.rows[0].count) > 0;
+    const isFirstTime = parseInt(enrollCount.rows[0].count) === 0;
 
-    // Get fee for country
-    let feeAmount = null;
-    let currencyCode = 'USD';
-    let countryId = null;
+    // ── 6. Application fee determination ─────────────────────────────────────
+    let appFeeHandled = !isFirstTime;   // returning students skip app fee
+    let appFeeStatus  = 'not_required'; // for returning students
+    let appFeeAmount  = null;
+    let countryId     = null;
+    let currencyCode  = 'USD';
+    let currencySymbol = '';
 
-    if (countryCode) {
-      const country = await db.query(
-        `SELECT c.id, c.currency_code, af.fee
-         FROM countries c
-         LEFT JOIN application_fees af ON af.country_id = c.id
-         WHERE c.code = $1`,
-        [countryCode.toUpperCase()]
-      );
-      if (country.rows[0]) {
-        countryId = country.rows[0].id;
-        currencyCode = country.rows[0].currency_code;
-        feeAmount = feeWaived ? null : (country.rows[0].fee ?? 15);
+    if (isFirstTime) {
+      if (feeWaiverStatus === 'approved') {
+        appFeeHandled = true;
+        appFeeStatus  = 'waived';
+      } else {
+        // null or 'rejected' — must pay
+        appFeeHandled = false;
+        appFeeStatus  = 'pending_payment';
+        if (countryCode) {
+          const country = await db.query(
+            `SELECT c.id, c.currency_code, c.currency_symbol, af.fee
+             FROM countries c LEFT JOIN application_fees af ON af.country_id = c.id
+             WHERE c.code = $1`,
+            [countryCode.toUpperCase()]
+          );
+          if (country.rows[0]) {
+            countryId      = country.rows[0].id;
+            currencyCode   = country.rows[0].currency_code;
+            currencySymbol = country.rows[0].currency_symbol || '';
+            appFeeAmount   = parseFloat(country.rows[0].fee ?? 15);
+          }
+        }
+        if (!appFeeAmount) {
+          const usd = await db.query(
+            `SELECT af.fee FROM application_fees af JOIN countries c ON c.id = af.country_id WHERE c.code = 'US'`
+          );
+          appFeeAmount = parseFloat(usd.rows[0]?.fee ?? 15);
+        }
       }
-    } else {
-      const usd = await db.query(
-        `SELECT af.fee FROM application_fees af JOIN countries c ON c.id = af.country_id WHERE c.code = 'US'`
-      );
-      feeAmount = feeWaived ? null : (usd.rows[0]?.fee ?? 15);
     }
 
-    // Insert application
-    const scholType = scholarshipRequested ? (scholarshipType || 'partial') : 'none';
+    // ── 7. Class pricing ──────────────────────────────────────────────────────
+    const pricingRes = await db.query(
+      `SELECT cp.price, cp.currency, co.currency_symbol
+       FROM class_pricing cp
+       LEFT JOIN countries co ON co.currency_code = cp.currency
+       WHERE cp.class_id = $1 AND cp.is_default = TRUE`,
+      [classId]
+    );
+    const classPrice    = pricingRes.rows[0]?.price  ? parseFloat(pricingRes.rows[0].price) : null;
+    const classCurrency = pricingRes.rows[0]?.currency || 'USD';
+    const classCurrencySymbol = pricingRes.rows[0]?.currency_symbol || '';
 
-    // Determine initial payment_status
-    const initialPaymentStatus = feeWaived ? 'waived' : 'pending_payment';
+    // Determine initial class_fee_status
+    let classFeeStatus = 'pending'; // waiting for app fee first
+    if (!classPrice || classPrice === 0) {
+      classFeeStatus = 'not_required';
+    } else if (appFeeHandled) {
+      classFeeStatus = 'pending_payment'; // ready to pay class fee immediately
+    }
 
+    // ── 8. Insert application ─────────────────────────────────────────────────
     const result = await db.query(
       `INSERT INTO class_applications
          (class_id, student_id, country_id, application_fee_charged, currency_code, fee_waived,
-          scholarship_requested, scholarship_type, payment_status)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+          payment_status, class_fee_status, class_fee_amount, scholarship_requested, scholarship_type)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
        RETURNING *`,
-      [classId, studentId, countryId, feeWaived ? 0 : feeAmount, currencyCode, feeWaived,
-       scholarshipRequested || false, scholType, initialPaymentStatus]
+      [
+        classId, studentId, countryId,
+        appFeeHandled ? 0 : (appFeeAmount || 0),
+        currencyCode,
+        appFeeStatus === 'waived',
+        appFeeHandled ? 'waived' : 'pending_payment',  // payment_status = app fee status
+        classFeeStatus,
+        classPrice || null,
+        false, 'none',
+      ]
     );
     const applicationId = result.rows[0].id;
+    const frontendUrl   = process.env.FRONTEND_URL || 'http://localhost:5173';
+    const student       = await db.query('SELECT name, email FROM users WHERE id = $1', [studentId]);
+    const stripe        = getStripe();
 
-    // ── Payment collection via Stripe ─────────────────────────────────────────
-    let checkoutUrl = null;
+    let checkoutUrl    = null;
     let stripeSessionId = null;
-    let stripeNotConfigured = false;
+    let feeType        = null;
 
-    if (!feeWaived) {
-      const stripe = getStripe();
+    // ── 9. Create Stripe session ──────────────────────────────────────────────
+    if (!appFeeHandled && appFeeAmount && appFeeAmount > 0 && stripe) {
+      // Phase 1: pay application fee
+      const session = await createStripeSession({
+        stripe,
+        email: student.rows[0].email,
+        amount: appFeeAmount,
+        currency: currencyCode,
+        name: `Application Fee — ${cls.rows[0].name}`,
+        desc: `One-time registration fee. Waived on all future class applications.`,
+        metadata: { applicationId, studentId, classId, feeType: 'app_fee' },
+        frontendUrl,
+        applicationId,
+      });
+      await db.query('UPDATE class_applications SET stripe_session_id = $1 WHERE id = $2', [session.id, applicationId]);
+      checkoutUrl    = session.url;
+      stripeSessionId = session.id;
+      feeType        = 'app_fee';
 
-      if (stripe) {
-        // Stripe is configured — create a Checkout session
-        const student = await db.query('SELECT name, email FROM users WHERE id = $1', [studentId]);
-        const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+    } else if (classFeeStatus === 'pending_payment' && classPrice && classPrice > 0 && stripe) {
+      // Phase 2: pay class tuition fee (app fee already handled)
+      const session = await createStripeSession({
+        stripe,
+        email: student.rows[0].email,
+        amount: classPrice,
+        currency: classCurrency,
+        name: `Class Fee — ${cls.rows[0].name}`,
+        desc: `Tuition fee for the class.`,
+        metadata: { applicationId, studentId, classId, feeType: 'class_fee' },
+        frontendUrl,
+        applicationId,
+      });
+      await db.query('UPDATE class_applications SET class_fee_stripe_session_id = $1 WHERE id = $2', [session.id, applicationId]);
+      checkoutUrl    = session.url;
+      stripeSessionId = session.id;
+      feeType        = 'class_fee';
 
-        // Only a subset of currencies are natively supported by Stripe — default to USD if unsupported
-        const STRIPE_CURRENCIES = ['usd', 'eur', 'gbp', 'cad', 'aud', 'sgd', 'inr', 'mxn'];
-        const chargeCurrency = STRIPE_CURRENCIES.includes(currencyCode.toLowerCase())
-          ? currencyCode.toLowerCase()
-          : 'usd';
-
-        const session = await stripe.checkout.sessions.create({
-          mode: 'payment',
-          customer_email: student.rows[0].email,
-          line_items: [{
-            price_data: {
-              currency: chargeCurrency,
-              product_data: {
-                name: `Application Fee — ${cls.rows[0].name}`,
-                description: 'One-time application fee for Arintu. Waived on all future class applications.',
-              },
-              unit_amount: Math.round(feeAmount * 100), // Stripe uses smallest currency unit (cents)
-            },
-            quantity: 1,
-          }],
-          metadata: { applicationId, studentId, classId },
-          success_url: `${frontendUrl}/payment/success?session_id={CHECKOUT_SESSION_ID}`,
-          cancel_url:  `${frontendUrl}/payment/cancel?app_id=${applicationId}`,
-        });
-
-        // Save session ID so the webhook and verify endpoint can find the application
-        await db.query(
-          'UPDATE class_applications SET stripe_session_id = $1 WHERE id = $2',
-          [session.id, applicationId]
-        );
-
-        checkoutUrl = session.url;
-        stripeSessionId = session.id;
-      } else {
-        // Stripe not yet configured — mark as stripe_pending so admins can still see it
-        await db.query(
-          "UPDATE class_applications SET payment_status = 'stripe_pending' WHERE id = $1",
-          [applicationId]
-        );
-        stripeNotConfigured = true;
-      }
-    }
-
-    // ── Notify admin for fee-waived or placeholder-mode applications ──────────
-    // (For Stripe-paid apps the webhook/verify triggers the notification on payment confirmation)
-    if (feeWaived || stripeNotConfigured) {
+    } else if (classFeeStatus === 'not_required') {
+      // Free class — enroll immediately
+      await db.query(`UPDATE class_applications SET status = 'approved', class_fee_status = 'not_required' WHERE id = $1`, [applicationId]);
+      await db.query(
+        `INSERT INTO enrollments (class_id, student_id, payment_status) VALUES ($1,$2,'paid') ON CONFLICT DO NOTHING`,
+        [classId, studentId]
+      );
       const admin = await db.query('SELECT admin_id FROM classes WHERE id = $1', [classId]);
-      const student = await db.query('SELECT name FROM users WHERE id = $1', [studentId]);
       if (admin.rows[0]) {
         await createNotification({
           userId: admin.rows[0].admin_id,
-          title: `New application: ${cls.rows[0].name}`,
-          message: `${student.rows[0]?.name} has applied to join "${cls.rows[0].name}".${stripeNotConfigured ? ' (Payment pending — Stripe not configured)' : ''}`,
+          title: `New enrolment: ${cls.rows[0].name}`,
+          message: `${student.rows[0].name} enrolled in "${cls.rows[0].name}" (free class).`,
           type: 'class',
           metadata: { applicationId, classId },
         });
@@ -205,13 +249,18 @@ router.post('/', authenticate, authorize('student'), async (req, res) => {
 
     res.status(201).json({
       ...result.rows[0],
-      feeWaived,
-      feeAmount: feeWaived ? 0 : feeAmount,
-      currencyCode,
-      // Stripe fields — frontend uses these to decide what to do next
-      checkoutUrl,          // non-null → redirect to Stripe
+      isFirstTime,
+      appFeeRequired:      !appFeeHandled,
+      appFeeWaiverStatus:  feeWaiverStatus,
+      appFeeAmount,
+      appFeeCurrencyCode:  currencyCode,
+      appFeeCurrencySymbol: currencySymbol,
+      classPrice,
+      classCurrency,
+      classCurrencySymbol,
+      checkoutUrl,
       stripeSessionId,
-      stripeNotConfigured,  // true → Stripe not set up yet, show placeholder message
+      feeType,
     });
   } catch (err) {
     console.error(err);
@@ -219,7 +268,175 @@ router.post('/', authenticate, authorize('student'), async (req, res) => {
   }
 });
 
-// GET /api/applications  — admin/superadmin sees all; student sees own
+// ── POST /api/applications/:id/retry-app-fee ── recreate Stripe session for app fee
+router.post('/:id/retry-app-fee', authenticate, authorize('student'), async (req, res) => {
+  try {
+    const app = await db.query(
+      `SELECT ca.*, cl.name as class_name,
+              co.currency_code, co.currency_symbol,
+              af.fee as country_app_fee
+       FROM class_applications ca
+       JOIN classes cl ON cl.id = ca.class_id
+       LEFT JOIN countries co ON co.id = ca.country_id
+       LEFT JOIN application_fees af ON af.country_id = ca.country_id
+       WHERE ca.id = $1 AND ca.student_id = $2`,
+      [req.params.id, req.user.id]
+    );
+    if (!app.rows[0]) return res.status(404).json({ error: 'Application not found' });
+
+    const a = app.rows[0];
+    if (a.payment_status !== 'pending_payment') {
+      return res.status(400).json({ error: `Application fee already settled (status: ${a.payment_status})` });
+    }
+
+    // fee amount: stored at application time as application_fee_charged
+    const feeAmount = parseFloat(a.application_fee_charged || a.country_app_fee || 15);
+    if (!feeAmount || feeAmount === 0) {
+      return res.status(400).json({ error: 'No application fee amount on record' });
+    }
+
+    const stripe = getStripe();
+    if (!stripe) return res.status(503).json({ error: 'Payment processing not configured' });
+
+    const student = await db.query('SELECT name, email FROM users WHERE id = $1', [req.user.id]);
+    const currency = a.currency_code || 'USD';
+    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+
+    const session = await createStripeSession({
+      stripe,
+      email: student.rows[0].email,
+      amount: feeAmount,
+      currency,
+      name: `Application Fee — ${a.class_name}`,
+      desc: 'One-time registration fee. Waived on all future class applications.',
+      metadata: { applicationId: a.id, studentId: req.user.id, classId: a.class_id, feeType: 'app_fee' },
+      frontendUrl,
+      applicationId: a.id,
+    });
+
+    await db.query('UPDATE class_applications SET stripe_session_id = $1 WHERE id = $2', [session.id, a.id]);
+
+    res.json({ checkoutUrl: session.url });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// ── PUT /api/applications/:id/request-scholarship ── student requests scholarship
+router.put('/:id/request-scholarship', authenticate, authorize('student'), async (req, res) => {
+  const { reason } = req.body;
+  try {
+    // Verify this application belongs to the student and is in the right state
+    const app = await db.query(
+      `SELECT id, class_fee_status, payment_status FROM class_applications
+       WHERE id = $1 AND student_id = $2`,
+      [req.params.id, req.user.id]
+    );
+    if (!app.rows[0]) return res.status(404).json({ error: 'Application not found' });
+
+    const { class_fee_status, payment_status } = app.rows[0];
+    if (!['pending_payment'].includes(class_fee_status)) {
+      return res.status(400).json({
+        error: `Cannot request scholarship in current state (${class_fee_status}). App fee must be settled first.`,
+      });
+    }
+
+    const result = await db.query(
+      `UPDATE class_applications
+       SET scholarship_requested = TRUE,
+           scholarship_type      = 'pending',
+           scholarship_reason    = $1,
+           class_fee_status      = 'scholarship_pending'
+       WHERE id = $2
+       RETURNING *`,
+      [reason || null, req.params.id]
+    );
+
+    // Notify admin(s) of the class
+    const cls = await db.query(
+      `SELECT cl.name, cl.admin_id, u.name as student_name
+       FROM class_applications ca
+       JOIN classes cl ON cl.id = ca.class_id
+       JOIN users u ON u.id = ca.student_id
+       WHERE ca.id = $1`,
+      [req.params.id]
+    );
+    if (cls.rows[0]?.admin_id) {
+      await createNotification({
+        userId: cls.rows[0].admin_id,
+        title: `Scholarship request: ${cls.rows[0].name}`,
+        message: `${cls.rows[0].student_name} has requested a scholarship for "${cls.rows[0].name}".`,
+        type: 'class',
+        metadata: { applicationId: req.params.id },
+      });
+    }
+
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// ── POST /api/applications/:id/pay-class-fee ── create Stripe session for class fee
+router.post('/:id/pay-class-fee', authenticate, authorize('student'), async (req, res) => {
+  try {
+    const app = await db.query(
+      `SELECT ca.*, cl.name as class_name, cl.id as class_id_val
+       FROM class_applications ca
+       JOIN classes cl ON cl.id = ca.class_id
+       WHERE ca.id = $1 AND ca.student_id = $2`,
+      [req.params.id, req.user.id]
+    );
+    if (!app.rows[0]) return res.status(404).json({ error: 'Application not found' });
+
+    const a = app.rows[0];
+    if (a.class_fee_status !== 'pending_payment') {
+      return res.status(400).json({ error: `Class fee is not ready for payment (status: ${a.class_fee_status})` });
+    }
+    if (!a.class_fee_amount || parseFloat(a.class_fee_amount) === 0) {
+      return res.status(400).json({ error: 'No class fee amount set' });
+    }
+
+    const stripe = getStripe();
+    if (!stripe) return res.status(503).json({ error: 'Payment processing not configured' });
+
+    const student = await db.query('SELECT name, email FROM users WHERE id = $1', [req.user.id]);
+    const pricingRes = await db.query(
+      'SELECT currency FROM class_pricing WHERE class_id = $1 AND is_default = TRUE',
+      [a.class_id]
+    );
+    const currency = pricingRes.rows[0]?.currency || 'USD';
+    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+
+    const session = await createStripeSession({
+      stripe,
+      email: student.rows[0].email,
+      amount: parseFloat(a.class_fee_amount),
+      currency,
+      name: `Class Fee — ${a.class_name}`,
+      desc: a.scholarship_discount_pct
+        ? `Discounted class fee (${a.scholarship_discount_pct}% scholarship applied)`
+        : 'Class tuition fee',
+      metadata: { applicationId: a.id, studentId: req.user.id, classId: a.class_id, feeType: 'class_fee' },
+      frontendUrl,
+      applicationId: a.id,
+    });
+
+    await db.query(
+      'UPDATE class_applications SET class_fee_stripe_session_id = $1 WHERE id = $2',
+      [session.id, a.id]
+    );
+
+    res.json({ checkoutUrl: session.url });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// ── GET /api/applications ── student sees own; admin sees class's paid apps ───
 router.get('/', authenticate, async (req, res) => {
   const { status, classId, scholarshipOnly } = req.query;
   const { id: userId, role } = req.user;
@@ -234,16 +451,15 @@ router.get('/', authenticate, async (req, res) => {
   } else if (role === 'admin') {
     where.push(`EXISTS (SELECT 1 FROM classes c WHERE c.id = ca.class_id AND c.admin_id = $${idx++})`);
     params.push(userId);
-  }
-
-  // Admins only see applications where payment is confirmed, waived, or pre-Stripe (legacy)
-  // Students see all their own applications regardless of payment state
-  if (role !== 'student') {
+    // Admins only see apps where app fee is settled
     where.push(`(ca.payment_status IS NULL OR ca.payment_status NOT IN ('pending_payment', 'failed'))`);
+  } else if (role === 'superadmin') {
+    // See all except failed payment attempts
+    where.push(`(ca.payment_status IS NULL OR ca.payment_status NOT IN ('failed'))`);
   }
 
-  if (status) { where.push(`ca.status = $${idx++}`); params.push(status); }
-  if (classId) { where.push(`ca.class_id = $${idx++}`); params.push(classId); }
+  if (status)  { where.push(`ca.status = $${idx++}`);    params.push(status); }
+  if (classId) { where.push(`ca.class_id = $${idx++}`);  params.push(classId); }
   if (scholarshipOnly === 'true') { where.push(`ca.scholarship_requested = TRUE`); }
 
   try {
@@ -264,44 +480,107 @@ router.get('/', authenticate, async (req, res) => {
     );
     res.json(result.rows);
   } catch (err) {
+    console.error(err);
     res.status(500).json({ error: 'Server error' });
   }
 });
 
-// PUT /api/applications/:id/scholarship  — super admin awards / updates scholarship
-router.put('/:id/scholarship', authenticate, authorize('superadmin'), async (req, res) => {
-  const { type, discountPct } = req.body;
-  if (!['none', 'partial', 'full'].includes(type)) {
-    return res.status(400).json({ error: 'type must be none, partial, or full' });
+// ── PUT /api/applications/:id/scholarship ── admin awards / updates scholarship
+router.put('/:id/scholarship', authenticate, authorize('admin', 'superadmin'), async (req, res) => {
+  const { type, discountPct, action } = req.body; // action: 'approve' | 'reject'
+
+  // 'reject' action — cancel scholarship, restore to pending_payment
+  if (action === 'reject') {
+    try {
+      const result = await db.query(
+        `UPDATE class_applications
+         SET scholarship_type         = 'none',
+             scholarship_discount_pct = NULL,
+             scholarship_reviewed_by  = $1,
+             scholarship_reviewed_at  = NOW(),
+             class_fee_status         = 'pending_payment'
+         WHERE id = $2
+         RETURNING *, (SELECT name FROM classes WHERE id = class_id) as class_name`,
+        [req.user.id, req.params.id]
+      );
+      if (!result.rows[0]) return res.status(404).json({ error: 'Application not found' });
+
+      await db.query(
+        `INSERT INTO notifications (user_id, title, message, type) VALUES ($1,$2,$3,'info')`,
+        [result.rows[0].student_id,
+         'Scholarship request update',
+         `Your scholarship request for "${result.rows[0].class_name}" was not approved. You can still enrol by paying the full class fee.`]
+      );
+      return res.json(result.rows[0]);
+    } catch (err) {
+      console.error(err);
+      return res.status(500).json({ error: 'Server error' });
+    }
+  }
+
+  // 'approve' action — set scholarship type
+  if (!['partial', 'full'].includes(type)) {
+    return res.status(400).json({ error: 'type must be partial or full' });
   }
   if (type === 'partial' && (discountPct == null || discountPct <= 0 || discountPct >= 100)) {
     return res.status(400).json({ error: 'Partial scholarship requires a discount percentage (1–99)' });
   }
+
   try {
+    const appRes = await db.query(
+      `SELECT ca.*, cl.name as class_name
+       FROM class_applications ca JOIN classes cl ON cl.id = ca.class_id
+       WHERE ca.id = $1`,
+      [req.params.id]
+    );
+    if (!appRes.rows[0]) return res.status(404).json({ error: 'Application not found' });
+    const app = appRes.rows[0];
+
+    let newClassFeeStatus = 'pending_payment';
+    let newClassFeeAmount = parseFloat(app.class_fee_amount || 0);
+
+    if (type === 'full') {
+      newClassFeeStatus = 'full_scholarship';
+      newClassFeeAmount = 0;
+    } else if (type === 'partial') {
+      newClassFeeAmount = Math.max(0, newClassFeeAmount * (1 - discountPct / 100));
+    }
+
     const result = await db.query(
       `UPDATE class_applications SET
-         scholarship_type        = $2,
-         scholarship_discount_pct = $3,
-         scholarship_reviewed_by  = $4,
-         scholarship_reviewed_at  = NOW()
-       WHERE id = $1
-       RETURNING *, (SELECT name FROM classes WHERE id = class_id) as class_name`,
-      [req.params.id, type, type === 'partial' ? discountPct : (type === 'full' ? 100 : null), req.user.id]
+         scholarship_type         = $1,
+         scholarship_discount_pct = $2,
+         scholarship_reviewed_by  = $3,
+         scholarship_reviewed_at  = NOW(),
+         class_fee_status         = $4,
+         class_fee_amount         = $5
+       WHERE id = $6
+       RETURNING *`,
+      [type, type === 'partial' ? discountPct : 100, req.user.id,
+       newClassFeeStatus, newClassFeeAmount, req.params.id]
     );
-    if (!result.rows[0]) return res.status(404).json({ error: 'Application not found' });
 
-    // Notify student if a scholarship was awarded
-    if (type !== 'none') {
-      const app = result.rows[0];
-      const msg = type === 'full'
-        ? `Congratulations! You have been awarded a full scholarship for "${app.class_name}". Your class fee is fully covered!`
-        : `Congratulations! You have been awarded a partial scholarship (${discountPct}% off) for "${app.class_name}".`;
+    // Full scholarship → auto-approve + enroll
+    if (type === 'full') {
       await db.query(
-        `INSERT INTO notifications (user_id, title, message, type)
-         VALUES ($1, 'Scholarship Awarded 🎓', $2, 'info')`,
-        [result.rows[0].student_id, msg]
+        `UPDATE class_applications SET status = 'approved', class_fee_paid_at = NOW() WHERE id = $1`,
+        [req.params.id]
+      );
+      await db.query(
+        `INSERT INTO enrollments (class_id, student_id, payment_status)
+         VALUES ($1,$2,'paid') ON CONFLICT DO NOTHING`,
+        [app.class_id, app.student_id]
       );
     }
+
+    const msg = type === 'full'
+      ? `Congratulations! You have been awarded a full scholarship for "${app.class_name}". You are now enrolled!`
+      : `Your scholarship request for "${app.class_name}" was approved — ${discountPct}% off the class fee. Please proceed to payment.`;
+
+    await db.query(
+      `INSERT INTO notifications (user_id, title, message, type) VALUES ($1,$2,$3,'info')`,
+      [app.student_id, 'Scholarship decision', msg]
+    );
 
     res.json(result.rows[0]);
   } catch (err) {
@@ -310,7 +589,7 @@ router.put('/:id/scholarship', authenticate, authorize('superadmin'), async (req
   }
 });
 
-// PUT /api/applications/:id/approve
+// ── PUT /api/applications/:id/approve ── admin enrols student (manual override)
 router.put('/:id/approve', authenticate, authorize('admin', 'superadmin'), async (req, res) => {
   const client = await db.pool.connect();
   try {
@@ -328,19 +607,15 @@ router.put('/:id/approve', authenticate, authorize('admin', 'superadmin'), async
       return res.status(404).json({ error: 'Application not found or already processed' });
     }
 
-    const { class_id, student_id } = app.rows[0];
-
-    // Enroll the student
+    const { class_id, student_id, payment_status } = app.rows[0];
+    const enrollPaymentStatus = payment_status === 'paid' ? 'paid' : 'pending';
     await client.query(
       `INSERT INTO enrollments (class_id, student_id, enrolled_by, payment_status)
-       VALUES ($1, $2, $3, 'pending')
-       ON CONFLICT DO NOTHING`,
-      [class_id, student_id, req.user.id]
+       VALUES ($1,$2,$3,$4) ON CONFLICT DO NOTHING`,
+      [class_id, student_id, req.user.id, enrollPaymentStatus]
     );
-
     await client.query('COMMIT');
 
-    // Notify student
     const cls = await db.query('SELECT name FROM classes WHERE id = $1', [class_id]);
     await createNotification({
       userId: student_id,
@@ -359,7 +634,7 @@ router.put('/:id/approve', authenticate, authorize('admin', 'superadmin'), async
   }
 });
 
-// PUT /api/applications/:id/reject
+// ── PUT /api/applications/:id/reject ── admin rejects application
 router.put('/:id/reject', authenticate, authorize('admin', 'superadmin'), async (req, res) => {
   const { notes } = req.body;
   const result = await db.query(
@@ -376,7 +651,7 @@ router.put('/:id/reject', authenticate, authorize('admin', 'superadmin'), async 
   await createNotification({
     userId: student_id,
     title: 'Application update',
-    message: `Your application for "${cls.rows[0]?.name}" was not approved at this time.${notes ? ' Note: ' + notes : ''}`,
+    message: `Your application for "${cls.rows[0]?.name}" was not approved.${notes ? ' Note: ' + notes : ''}`,
     type: 'class',
   });
 

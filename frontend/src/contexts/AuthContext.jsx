@@ -26,14 +26,14 @@ export function AuthProvider({ children }) {
   const login = async (email, password) => {
     const res = await authApi.login({ email, password });
     localStorage.setItem('arintu_token', res.data.token);
-    setUser(res.data.user);
+    await loadUser(); // fetch full user from /me so field names are consistent (snake_case)
     return res.data.user;
   };
 
   const register = async (name, email, password) => {
     const res = await authApi.register({ name, email, password });
     localStorage.setItem('arintu_token', res.data.token);
-    setUser(res.data.user);
+    await loadUser(); // fetch full user from /me so field names are consistent (snake_case)
     return res.data.user;
   };
 

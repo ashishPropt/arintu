@@ -157,7 +157,7 @@ function AwardModal({ app, onClose, onSaved }) {
     setLoading(true);
     setError('');
     try {
-      await appsApi.awardScholarship(app.id, type, type === 'partial' ? parseFloat(discountPct) : undefined);
+      await appsApi.awardScholarship(app.id, 'approve', type, type === 'partial' ? parseFloat(discountPct) : undefined);
       onSaved();
     } catch (err) {
       setError(err.response?.data?.error || 'Failed to save');
@@ -167,7 +167,7 @@ function AwardModal({ app, onClose, onSaved }) {
   const removeScholarship = async () => {
     setLoading(true);
     try {
-      await appsApi.awardScholarship(app.id, 'none');
+      await appsApi.awardScholarship(app.id, 'reject');
       onSaved();
     } catch {} finally { setLoading(false); }
   };

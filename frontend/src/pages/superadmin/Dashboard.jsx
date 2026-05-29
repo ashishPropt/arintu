@@ -14,11 +14,11 @@ export default function SuperAdminDashboard() {
       pricing.list(),
     ]).then(([admins, teachers, students, cls, tiers]) => {
       setStats({
-        admins: admins.data.total || 0,
+        admins:   admins.data.total   || 0,
         teachers: teachers.data.total || 0,
         students: students.data.total || 0,
-        classes: cls.data.total || 0,
-        tiers: tiers.data.length || 0,
+        classes:  cls.data.total      || cls.data.classes?.length || 0,
+        tiers:    tiers.data.length   || 0,
       });
     }).catch(() => {});
   }, []);
