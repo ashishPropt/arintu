@@ -80,6 +80,7 @@ export const regions = {
 export const countries = {
   list: () => api.get('/countries'),
   create: (data) => api.post('/countries', data),
+  update: (id, data) => api.put(`/countries/${id}`, data),
   remove: (id) => api.delete(`/countries/${id}`),
   fees: () => api.get('/countries/fees'),
   setFee: (countryId, fee) => api.put(`/countries/fees/${countryId}`, { fee }),

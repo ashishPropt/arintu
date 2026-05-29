@@ -37,6 +37,37 @@ router.post('/', authenticate, authorize('superadmin'), async (req, res) => {
   }
 });
 
+// PUT /api/countries/:id  — superadmin
+router.put('/:id', authenticate, authorize('superadmin'), async (req, res) => {
+  const { name, code, currencyCode, currencySymbol, currencyName } = req.body;
+  try {
+    const result = await db.query(
+      `UPDATE countries SET
+         name            = COALESCE($1, name),
+         code            = COALESCE($2, code),
+         currency_code   = COALESCE($3, currency_code),
+         currency_symbol = COALESCE($4, currency_symbol),
+         currency_name   = COALESCE($5, currency_name),
+         updated_at      = NOW()
+       WHERE id = $6
+       RETURNING *`,
+      [
+        name || null,
+        code ? code.toUpperCase() : null,
+        currencyCode ? currencyCode.toUpperCase() : null,
+        currencySymbol || null,
+        currencyName || null,
+        req.params.id,
+      ]
+    );
+    if (!result.rows[0]) return res.status(404).json({ error: 'Country not found' });
+    res.json(result.rows[0]);
+  } catch (err) {
+    if (err.code === '23505') return res.status(409).json({ error: 'Country code already exists' });
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
 // DELETE /api/countries/:id  — superadmin
 router.delete('/:id', authenticate, authorize('superadmin'), async (req, res) => {
   await db.query('DELETE FROM countries WHERE id = $1', [req.params.id]);
