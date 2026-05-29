@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import Logo from '../components/Logo';
 
@@ -76,10 +76,20 @@ export default function Login() {
                 required
               />
             </div>
-            <button type="submit" disabled={loading} className="btn-primary w-full mt-1">
+            <div className="flex justify-end">
+              <Link to="/forgot-password" className="text-xs text-brand-600 hover:underline">
+                Forgot password?
+              </Link>
+            </div>
+            <button type="submit" disabled={loading} className="btn-primary w-full">
               {loading ? 'Signing in…' : 'Sign in'}
             </button>
           </form>
+
+          <p className="text-center text-xs text-gray-400 mt-4">
+            Need an account?{' '}
+            <Link to="/register" className="text-brand-600 hover:underline">Create one</Link>
+          </p>
         </div>
 
         <p className="text-center text-xs text-gray-400 mt-6">

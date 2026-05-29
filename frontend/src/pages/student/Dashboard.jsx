@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { classes, schedules, waivers as waiversApi } from '../../api';
+import { useState, useEffect, useRef } from 'react';
+import { classes, schedules, waivers as waiversApi, verification as verificationApi } from '../../api';
 import { useAuth } from '../../contexts/AuthContext';
 import { Link } from 'react-router-dom';
 import { format } from 'date-fns';
@@ -22,11 +22,15 @@ export default function StudentDashboard() {
   }, []);
 
   const waiverStatus = user?.fee_waiver_status;
+  const verificationStatus = user?.verification_status;
 
   return (
     <div>
       <h1 className="text-xl font-bold text-gray-900 mb-1">My Learning</h1>
       <p className="text-sm text-gray-500 mb-6">Your enrolled classes and upcoming sessions</p>
+
+      {/* ID Verification Card */}
+      <VerificationCard status={verificationStatus} notes={user?.verification_notes} onUploaded={reloadUser} />
 
       {/* Fee Waiver Status Card */}
       <WaiverCard
@@ -89,6 +93,103 @@ export default function StudentDashboard() {
           onSubmitted={() => { setShowWaiverModal(false); reloadUser(); }}
         />
       )}
+    </div>
+  );
+}
+
+function VerificationCard({ status, notes, onUploaded }) {
+  const fileInputRef = useRef(null);
+  const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState('');
+
+  const handleFile = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    setUploadError('');
+    setUploading(true);
+    try {
+      await verificationApi.uploadId(file);
+      onUploaded(); // reload user so verification_status updates
+    } catch (err) {
+      setUploadError(err.response?.data?.error || 'Upload failed. Please try again.');
+    } finally {
+      setUploading(false);
+      e.target.value = '';
+    }
+  };
+
+  if (status === 'approved') {
+    return (
+      <div className="mb-5 flex items-center gap-3 p-4 rounded-xl bg-green-50 border border-green-100">
+        <span className="text-2xl">✅</span>
+        <div>
+          <p className="text-sm font-semibold text-green-800">Identity Verified</p>
+          <p className="text-xs text-green-700">Your ID has been verified. You are eligible to apply to classes.</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (status === 'pending') {
+    return (
+      <div className="mb-5 flex items-center gap-3 p-4 rounded-xl bg-amber-50 border border-amber-100">
+        <span className="text-2xl">⏳</span>
+        <div>
+          <p className="text-sm font-semibold text-amber-800">ID Verification Pending</p>
+          <p className="text-xs text-amber-700">Your document is under review. You can apply once it is approved.</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (status === 'rejected') {
+    return (
+      <div className="mb-5 p-4 rounded-xl bg-red-50 border border-red-100">
+        <div className="flex items-center gap-3 mb-2">
+          <span className="text-2xl">❌</span>
+          <div>
+            <p className="text-sm font-semibold text-red-800">ID Verification Not Approved</p>
+            <p className="text-xs text-red-700">
+              {notes ? `Reason: ${notes}` : 'Your document could not be verified.'}
+              {' '}Please upload a clear government-issued ID.
+            </p>
+          </div>
+        </div>
+        {uploadError && <p className="text-xs text-red-600 mb-2">{uploadError}</p>}
+        <input ref={fileInputRef} type="file" accept=".jpg,.jpeg,.png,.pdf" className="hidden" onChange={handleFile} />
+        <button
+          onClick={() => fileInputRef.current?.click()}
+          disabled={uploading}
+          className="text-xs text-red-600 underline hover:no-underline disabled:opacity-50"
+        >
+          {uploading ? 'Uploading…' : 'Re-upload ID document'}
+        </button>
+      </div>
+    );
+  }
+
+  // Not yet uploaded
+  return (
+    <div className="mb-5 p-4 rounded-xl bg-blue-50 border border-blue-100">
+      <div className="flex items-start gap-3 mb-3">
+        <span className="text-2xl">🪪</span>
+        <div className="flex-1">
+          <p className="text-sm font-semibold text-blue-800">ID Verification Required</p>
+          <p className="text-xs text-blue-700 mt-0.5">
+            Upload a government-issued ID (passport, driver license, or national ID) to apply to classes.
+            Accepted: JPG, PNG, PDF · Max 5 MB.
+          </p>
+        </div>
+      </div>
+      {uploadError && <p className="text-xs text-red-600 mb-2">{uploadError}</p>}
+      <input ref={fileInputRef} type="file" accept=".jpg,.jpeg,.png,.pdf" className="hidden" onChange={handleFile} />
+      <button
+        onClick={() => fileInputRef.current?.click()}
+        disabled={uploading}
+        className="text-xs font-medium text-blue-700 bg-white border border-blue-200 rounded-lg px-3 py-1.5 hover:bg-blue-50 transition-colors disabled:opacity-50"
+      >
+        {uploading ? 'Uploading…' : 'Upload ID Document →'}
+      </button>
     </div>
   );
 }

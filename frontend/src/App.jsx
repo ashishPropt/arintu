@@ -8,6 +8,7 @@ import Dashboard from './pages/Dashboard';
 import Classes from './pages/Classes';
 import Schedules from './pages/Schedules';
 import Users from './pages/Users';
+import Worksheets from './pages/Worksheets';
 import Pricing from './pages/superadmin/Pricing';
 import Regions from './pages/superadmin/Regions';
 import Countries from './pages/superadmin/Countries';
@@ -16,7 +17,12 @@ import Scholarships from './pages/superadmin/Scholarships';
 import ManageTeam from './pages/superadmin/ManageTeam';
 import ManageCities from './pages/superadmin/ManageCities';
 import ManageBooks from './pages/superadmin/ManageBooks';
+import PendingAccounts from './pages/superadmin/PendingAccounts';
 import Applications from './pages/admin/Applications';
+import StudentVerification from './pages/admin/StudentVerification';
+import ForgotPassword from './pages/ForgotPassword';
+import ResetPassword from './pages/ResetPassword';
+import Register from './pages/Register';
 
 // Public content pages
 import Team from './pages/public/Team';
@@ -52,10 +58,13 @@ export default function App() {
     <AuthProvider>
       <BrowserRouter>
         <Routes>
-          {/* Login */}
+          {/* Auth */}
           <Route path="/login" element={<LoginRedirect />} />
+          <Route path="/register" element={<Register />} />
+          <Route path="/forgot-password" element={<ForgotPassword />} />
+          <Route path="/reset-password" element={<ResetPassword />} />
 
-          {/* Public pages — all wrapped in PublicLayout (shared header + footer) */}
+          {/* Public pages — wrapped in PublicLayout (shared header + footer) */}
           <Route element={<PublicLayout />}>
             <Route path="/" element={<Landing />} />
             <Route path="/about/team"      element={<Team />} />
@@ -81,9 +90,20 @@ export default function App() {
             <Route path="dashboard" element={<Dashboard />} />
             <Route path="classes" element={<Classes />} />
             <Route path="schedules" element={<Schedules />} />
+            <Route path="worksheets" element={<Worksheets />} />
             <Route path="users" element={
               <RequireAuth roles={['superadmin', 'admin']}>
                 <Users />
+              </RequireAuth>
+            } />
+            <Route path="verification" element={
+              <RequireAuth roles={['superadmin', 'admin']}>
+                <StudentVerification />
+              </RequireAuth>
+            } />
+            <Route path="pending-accounts" element={
+              <RequireAuth roles={['superadmin']}>
+                <PendingAccounts />
               </RequireAuth>
             } />
             <Route path="pricing" element={

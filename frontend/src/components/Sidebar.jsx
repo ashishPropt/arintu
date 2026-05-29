@@ -4,35 +4,42 @@ import Logo from './Logo';
 
 const navByRole = {
   superadmin: [
-    { to: '/app/dashboard', label: 'Dashboard', icon: HomeIcon },
-    { to: '/app/users', label: 'Users', icon: UsersIcon },
-    { to: '/app/countries', label: 'Countries & Fees', icon: GlobeIcon },
-    { to: '/app/pricing', label: 'Pricing', icon: TagIcon },
-    { to: '/app/classes', label: 'All Classes', icon: BookIcon },
-    { to: '/app/schedules', label: 'Schedules', icon: CalIcon },
-    { to: '/app/applications', label: 'Applications', icon: ClipboardIcon },
-    { to: '/app/fee-waivers', label: 'Fee Waivers', icon: WaiverIcon },
-    { to: '/app/scholarships', label: 'Scholarships', icon: ScholarshipIcon },
-    { to: '/app/manage-team', label: 'Team Members', icon: TeamIcon },
-    { to: '/app/manage-cities', label: 'Cities', icon: CityIcon },
-    { to: '/app/manage-books', label: 'Book Club', icon: BookOpenIcon },
+    { to: '/app/dashboard',       label: 'Dashboard',        icon: HomeIcon },
+    { to: '/app/pending-accounts',label: 'Pending Accounts', icon: PendingIcon },
+    { to: '/app/users',           label: 'Users',            icon: UsersIcon },
+    { to: '/app/countries',       label: 'Countries & Fees', icon: GlobeIcon },
+    { to: '/app/pricing',         label: 'Pricing',          icon: TagIcon },
+    { to: '/app/classes',         label: 'All Classes',      icon: BookIcon },
+    { to: '/app/worksheets',      label: 'Worksheets',       icon: WorksheetIcon },
+    { to: '/app/schedules',       label: 'Schedules',        icon: CalIcon },
+    { to: '/app/applications',    label: 'Applications',     icon: ClipboardIcon },
+    { to: '/app/verification',    label: 'ID Verification',  icon: ShieldIcon },
+    { to: '/app/fee-waivers',     label: 'Fee Waivers',      icon: WaiverIcon },
+    { to: '/app/scholarships',    label: 'Scholarships',     icon: ScholarshipIcon },
+    { to: '/app/manage-team',     label: 'Team Members',     icon: TeamIcon },
+    { to: '/app/manage-cities',   label: 'Cities',           icon: CityIcon },
+    { to: '/app/manage-books',    label: 'Book Club',        icon: BookOpenIcon },
   ],
   admin: [
-    { to: '/app/dashboard', label: 'Dashboard', icon: HomeIcon },
-    { to: '/app/classes', label: 'Classes', icon: BookIcon },
-    { to: '/app/schedules', label: 'Schedules', icon: CalIcon },
-    { to: '/app/users', label: 'Users', icon: UsersIcon },
-    { to: '/app/applications', label: 'Applications', icon: ClipboardIcon },
+    { to: '/app/dashboard',    label: 'Dashboard',       icon: HomeIcon },
+    { to: '/app/classes',      label: 'Classes',         icon: BookIcon },
+    { to: '/app/worksheets',   label: 'Worksheets',      icon: WorksheetIcon },
+    { to: '/app/schedules',    label: 'Schedules',       icon: CalIcon },
+    { to: '/app/users',        label: 'Users',           icon: UsersIcon },
+    { to: '/app/applications', label: 'Applications',    icon: ClipboardIcon },
+    { to: '/app/verification', label: 'ID Verification', icon: ShieldIcon },
   ],
   teacher: [
-    { to: '/app/dashboard', label: 'Dashboard', icon: HomeIcon },
-    { to: '/app/classes', label: 'My Classes', icon: BookIcon },
-    { to: '/app/schedules', label: 'Schedule', icon: CalIcon },
+    { to: '/app/dashboard',  label: 'Dashboard',  icon: HomeIcon },
+    { to: '/app/classes',    label: 'My Classes', icon: BookIcon },
+    { to: '/app/worksheets', label: 'Worksheets', icon: WorksheetIcon },
+    { to: '/app/schedules',  label: 'Schedule',   icon: CalIcon },
   ],
   student: [
-    { to: '/app/dashboard', label: 'Dashboard', icon: HomeIcon },
-    { to: '/app/classes', label: 'My Classes', icon: BookIcon },
-    { to: '/app/schedules', label: 'Schedule', icon: CalIcon },
+    { to: '/app/dashboard',  label: 'Dashboard',  icon: HomeIcon },
+    { to: '/app/classes',    label: 'My Classes', icon: BookIcon },
+    { to: '/app/worksheets', label: 'Worksheets', icon: WorksheetIcon },
+    { to: '/app/schedules',  label: 'Schedule',   icon: CalIcon },
   ],
 };
 
@@ -182,6 +189,27 @@ function BookOpenIcon({ className }) {
   return (
     <svg className={className} viewBox="0 0 20 20" fill="currentColor">
       <path d="M9 4.804A7.968 7.968 0 005.5 4c-1.255 0-2.443.29-3.5.804v10A7.969 7.969 0 015.5 14c1.669 0 3.218.51 4.5 1.385A7.962 7.962 0 0114.5 14c1.255 0 2.443.29 3.5.804v-10A7.968 7.968 0 0014.5 4c-1.255 0-2.443.29-3.5.804V12a1 1 0 11-2 0V4.804z"/>
+    </svg>
+  );
+}
+function ShieldIcon({ className }) {
+  return (
+    <svg className={className} viewBox="0 0 20 20" fill="currentColor">
+      <path fillRule="evenodd" d="M2.166 4.999A11.954 11.954 0 0010 1.944 11.954 11.954 0 0017.834 5c.11.65.166 1.32.166 2.001 0 5.225-3.34 9.67-8 11.317C5.34 16.67 2 12.225 2 7c0-.682.057-1.35.166-2.001zm11.541 3.708a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd"/>
+    </svg>
+  );
+}
+function WorksheetIcon({ className }) {
+  return (
+    <svg className={className} viewBox="0 0 20 20" fill="currentColor">
+      <path fillRule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4zm2 6a1 1 0 011-1h6a1 1 0 110 2H7a1 1 0 01-1-1zm1 3a1 1 0 100 2h6a1 1 0 100-2H7z" clipRule="evenodd"/>
+    </svg>
+  );
+}
+function PendingIcon({ className }) {
+  return (
+    <svg className={className} viewBox="0 0 20 20" fill="currentColor">
+      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clipRule="evenodd"/>
     </svg>
   );
 }

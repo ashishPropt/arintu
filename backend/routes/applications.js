@@ -23,11 +23,27 @@ router.post('/', authenticate, authorize('student'), async (req, res) => {
   const studentId = req.user.id;
 
   try {
-    // Block students with a pending fee waiver request
+    // Load student record for validation
     const waiver = await db.query(
-      'SELECT fee_waiver_status FROM users WHERE id = $1',
+      'SELECT fee_waiver_status, verification_status FROM users WHERE id = $1',
       [studentId]
     );
+
+    // Block if ID not verified
+    const verStatus = waiver.rows[0]?.verification_status;
+    if (verStatus !== 'approved') {
+      const code = verStatus === 'pending' ? 'VERIFICATION_PENDING'
+                 : verStatus === 'rejected' ? 'VERIFICATION_REJECTED'
+                 : 'VERIFICATION_REQUIRED';
+      const msg = verStatus === 'pending'
+        ? 'Your ID verification is pending admin review. You can apply once it is approved.'
+        : verStatus === 'rejected'
+        ? 'Your ID verification was not approved. Please re-upload your ID document from the dashboard.'
+        : 'You must upload and verify your ID before applying to classes. Please go to your dashboard to submit your ID document.';
+      return res.status(403).json({ error: msg, code });
+    }
+
+    // Block students with a pending fee waiver request
     if (waiver.rows[0]?.fee_waiver_status === 'pending') {
       return res.status(403).json({
         error: 'Your fee waiver request is pending super admin review. You cannot apply until it is processed.',

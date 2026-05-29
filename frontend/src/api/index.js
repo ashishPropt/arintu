@@ -26,6 +26,9 @@ export const auth = {
   register: (data) => api.post('/auth/register', data),
   me: () => api.get('/auth/me'),
   changePassword: (data) => api.post('/auth/change-password', data),
+  forgotPassword: (email) => api.post('/auth/forgot-password', { email }),
+  resetPassword: (token, newPassword) => api.post('/auth/reset-password', { token, newPassword }),
+  verifyResetToken: (token) => api.get('/auth/verify-reset-token', { params: { token } }),
 };
 
 export const users = {
@@ -34,6 +37,9 @@ export const users = {
   get: (id) => api.get(`/users/${id}`),
   update: (id, data) => api.put(`/users/${id}`, data),
   remove: (id) => api.delete(`/users/${id}`),
+  pendingApproval: () => api.get('/users/pending-approval'),
+  approveAccount: (id) => api.put(`/users/${id}/approve-account`),
+  rejectAccount: (id, notes) => api.put(`/users/${id}/reject-account`, { notes }),
 };
 
 export const classes = {
@@ -99,6 +105,32 @@ export const waivers = {
   getMyStatus: () => api.get('/waivers/me'),
   list: (params) => api.get('/waivers', { params }),
   review: (userId, action, notes) => api.put(`/waivers/${userId}/review`, { action, notes }),
+};
+
+export const verification = {
+  uploadId: (file) => {
+    const fd = new FormData();
+    fd.append('id_document', file);
+    return api.post('/verification/upload-id', fd, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+  },
+  status: () => api.get('/verification/status'),
+  list: (status) => api.get('/verification', { params: status ? { status } : {} }),
+  approve: (userId) => api.put(`/verification/${userId}/approve`),
+  reject: (userId, notes) => api.put(`/verification/${userId}/reject`, { notes }),
+};
+
+export const worksheets = {
+  list: (classId) => api.get('/worksheets', { params: { classId } }),
+  create: (formData) => api.post('/worksheets', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  }),
+  update: (id, formData) => api.put(`/worksheets/${id}`, formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  }),
+  remove: (id) => api.delete(`/worksheets/${id}`),
+  download: (id) => api.get(`/worksheets/${id}/download`, { responseType: 'blob' }),
 };
 
 export const publicApi = {

@@ -3,6 +3,8 @@ const bcrypt = require('bcryptjs');
 const { body, validationResult } = require('express-validator');
 const db = require('../database/db');
 const { authenticate, authorize } = require('../middleware/auth');
+const emailSvc = require('../services/email');
+const { createNotification } = require('../services/notifications');
 
 const router = express.Router();
 
@@ -131,6 +133,76 @@ router.put('/:id', authenticate, authorize('superadmin', 'admin'), async (req, r
 router.delete('/:id', authenticate, authorize('superadmin'), async (req, res) => {
   await db.query('UPDATE users SET is_active = FALSE WHERE id = $1', [req.params.id]);
   res.json({ message: 'User deactivated' });
+});
+
+// ── GET /api/users/pending-approval  (superadmin) ─────────────────────────────
+// Returns admin and teacher accounts awaiting superadmin approval
+router.get('/pending-approval', authenticate, authorize('superadmin'), async (req, res) => {
+  try {
+    const result = await db.query(
+      `SELECT id, email, name, role, account_status, created_at
+       FROM users
+       WHERE account_status = 'pending' AND role IN ('admin', 'teacher')
+       ORDER BY created_at ASC`
+    );
+    res.json(result.rows);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// ── PUT /api/users/:id/approve-account  (superadmin) ─────────────────────────
+router.put('/:id/approve-account', authenticate, authorize('superadmin'), async (req, res) => {
+  try {
+    const result = await db.query(
+      `UPDATE users SET account_status = 'active', is_active = TRUE, updated_at = NOW()
+       WHERE id = $1 AND account_status = 'pending'
+       RETURNING id, email, name, role, account_status`,
+      [req.params.id]
+    );
+    if (!result.rows[0]) return res.status(404).json({ error: 'User not found or not pending' });
+
+    const user = result.rows[0];
+
+    // Notify in-app
+    await createNotification({
+      userId: user.id,
+      title: 'Account approved',
+      message: 'Your account has been approved by the super admin. You can now sign in.',
+      type: 'info',
+    });
+
+    // Send email
+    emailSvc.sendAccountApproved(user.email, user.name, user.role).catch(() => {});
+
+    res.json(user);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// ── PUT /api/users/:id/reject-account  (superadmin) ──────────────────────────
+router.put('/:id/reject-account', authenticate, authorize('superadmin'), async (req, res) => {
+  const { notes } = req.body;
+  try {
+    const result = await db.query(
+      `UPDATE users SET account_status = 'rejected', is_active = FALSE, updated_at = NOW()
+       WHERE id = $1 AND account_status = 'pending'
+       RETURNING id, email, name, role, account_status`,
+      [req.params.id]
+    );
+    if (!result.rows[0]) return res.status(404).json({ error: 'User not found or not pending' });
+
+    const user = result.rows[0];
+    emailSvc.sendAccountRejected(user.email, user.name, user.role, notes).catch(() => {});
+
+    res.json(user);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
 });
 
 module.exports = router;

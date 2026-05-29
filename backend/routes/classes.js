@@ -74,13 +74,13 @@ router.post(
     const errors = validationResult(req);
     if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
 
-    const { name, description, subject, level, maxStudents } = req.body;
+    const { name, description, subject, level, maxStudents, enrollmentDeadline, allowLateEnrollment } = req.body;
     try {
       const result = await db.query(
-        `INSERT INTO classes (name, description, admin_id, subject, level, max_students)
-         VALUES ($1, $2, $3, $4, $5, $6)
+        `INSERT INTO classes (name, description, admin_id, subject, level, max_students, enrollment_deadline, allow_late_enrollment)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
          RETURNING *`,
-        [name, description, req.user.id, subject, level, maxStudents || 30]
+        [name, description, req.user.id, subject, level, maxStudents || 30, enrollmentDeadline || null, allowLateEnrollment || false]
       );
       res.status(201).json(result.rows[0]);
     } catch {
@@ -117,17 +117,19 @@ router.get('/:id', authenticate, async (req, res) => {
 
 // PUT /api/classes/:id
 router.put('/:id', authenticate, authorize('admin', 'superadmin'), async (req, res) => {
-  const { name, description, subject, level, maxStudents, isActive } = req.body;
+  const { name, description, subject, level, maxStudents, isActive, enrollmentDeadline, allowLateEnrollment } = req.body;
   try {
     const result = await db.query(
       `UPDATE classes SET
          name = COALESCE($1, name), description = COALESCE($2, description),
          subject = COALESCE($3, subject), level = COALESCE($4, level),
          max_students = COALESCE($5, max_students), is_active = COALESCE($6, is_active),
+         enrollment_deadline = COALESCE($7, enrollment_deadline),
+         allow_late_enrollment = COALESCE($8, allow_late_enrollment),
          updated_at = NOW()
-       WHERE id = $7 AND ($8 = 'superadmin' OR admin_id = $9)
+       WHERE id = $9 AND ($10 = 'superadmin' OR admin_id = $11)
        RETURNING *`,
-      [name, description, subject, level, maxStudents, isActive, req.params.id, req.user.role, req.user.id]
+      [name, description, subject, level, maxStudents, isActive, enrollmentDeadline, allowLateEnrollment, req.params.id, req.user.role, req.user.id]
     );
     if (!result.rows[0]) return res.status(404).json({ error: 'Class not found' });
     res.json(result.rows[0]);

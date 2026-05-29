@@ -34,6 +34,8 @@ app.use('/api/waivers',       require('./routes/waivers'));
 app.use('/api/content',       require('./routes/content'));
 app.use('/api/payments',      require('./routes/payments'));
 app.use('/api/public',        require('./routes/public'));
+app.use('/api/verification',  require('./routes/verification'));
+app.use('/api/worksheets',    require('./routes/worksheets'));
 
 app.get('/api/health', (req, res) => res.json({ status: 'ok', version: '1.0.0' }));
 
