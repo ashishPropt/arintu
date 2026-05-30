@@ -492,24 +492,48 @@ router.put('/:id/scholarship', authenticate, authorize('admin', 'superadmin'), a
   // 'reject' action — cancel scholarship, restore to pending_payment
   if (action === 'reject') {
     try {
+      // Fetch current app state + original class price before updating
+      const appRes = await db.query(
+        `SELECT ca.*, cp.price as original_class_price,
+                (SELECT name FROM classes WHERE id = ca.class_id) as class_name
+         FROM class_applications ca
+         LEFT JOIN class_pricing cp ON cp.class_id = ca.class_id AND cp.is_default = TRUE
+         WHERE ca.id = $1`,
+        [req.params.id]
+      );
+      if (!appRes.rows[0]) return res.status(404).json({ error: 'Application not found' });
+      const app = appRes.rows[0];
+
+      const wasFullScholarship = app.class_fee_status === 'full_scholarship';
+      const originalPrice = parseFloat(app.original_class_price || 0) || null;
+
       const result = await db.query(
         `UPDATE class_applications
          SET scholarship_type         = 'none',
              scholarship_discount_pct = NULL,
              scholarship_reviewed_by  = $1,
              scholarship_reviewed_at  = NOW(),
-             class_fee_status         = 'pending_payment'
-         WHERE id = $2
-         RETURNING *, (SELECT name FROM classes WHERE id = class_id) as class_name`,
-        [req.user.id, req.params.id]
+             class_fee_status         = 'pending_payment',
+             class_fee_amount         = $2,
+             status                   = 'pending'
+         WHERE id = $3
+         RETURNING *`,
+        [req.user.id, originalPrice, req.params.id]
       );
-      if (!result.rows[0]) return res.status(404).json({ error: 'Application not found' });
+
+      // If the student was auto-enrolled via full scholarship, remove that enrollment
+      if (wasFullScholarship) {
+        await db.query(
+          'DELETE FROM enrollments WHERE class_id = $1 AND student_id = $2',
+          [app.class_id, app.student_id]
+        );
+      }
 
       await db.query(
         `INSERT INTO notifications (user_id, title, message, type) VALUES ($1,$2,$3,'info')`,
-        [result.rows[0].student_id,
+        [app.student_id,
          'Scholarship request update',
-         `Your scholarship request for "${result.rows[0].class_name}" was not approved. You can still enrol by paying the full class fee.`]
+         `Your scholarship request for "${app.class_name}" was not approved. You can still enrol by paying the full class fee.`]
       );
       return res.json(result.rows[0]);
     } catch (err) {
