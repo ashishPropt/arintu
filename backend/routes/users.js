@@ -97,6 +97,24 @@ router.post(
   }
 );
 
+// ── GET /api/users/pending-approval  (superadmin) ─────────────────────────────
+// Returns admin and teacher accounts awaiting superadmin approval
+// IMPORTANT: must be registered BEFORE /:id so Express doesn't match "pending-approval" as a UUID
+router.get('/pending-approval', authenticate, authorize('superadmin'), async (req, res) => {
+  try {
+    const result = await db.query(
+      `SELECT id, email, name, role, account_status, created_at
+       FROM users
+       WHERE account_status = 'pending' AND role IN ('admin', 'teacher')
+       ORDER BY created_at ASC`
+    );
+    res.json(result.rows);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
 // GET /api/users/:id
 router.get('/:id', authenticate, authorize('superadmin', 'admin'), async (req, res) => {
   const result = await db.query(
@@ -133,23 +151,6 @@ router.put('/:id', authenticate, authorize('superadmin', 'admin'), async (req, r
 router.delete('/:id', authenticate, authorize('superadmin'), async (req, res) => {
   await db.query('UPDATE users SET is_active = FALSE WHERE id = $1', [req.params.id]);
   res.json({ message: 'User deactivated' });
-});
-
-// ── GET /api/users/pending-approval  (superadmin) ─────────────────────────────
-// Returns admin and teacher accounts awaiting superadmin approval
-router.get('/pending-approval', authenticate, authorize('superadmin'), async (req, res) => {
-  try {
-    const result = await db.query(
-      `SELECT id, email, name, role, account_status, created_at
-       FROM users
-       WHERE account_status = 'pending' AND role IN ('admin', 'teacher')
-       ORDER BY created_at ASC`
-    );
-    res.json(result.rows);
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: 'Server error' });
-  }
 });
 
 // ── PUT /api/users/:id/approve-account  (superadmin) ─────────────────────────

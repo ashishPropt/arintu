@@ -12,11 +12,8 @@ import Worksheets from './pages/Worksheets';
 import Pricing from './pages/superadmin/Pricing';
 import Regions from './pages/superadmin/Regions';
 import Countries from './pages/superadmin/Countries';
-import FeeWaivers from './pages/superadmin/FeeWaivers';
 import Scholarships from './pages/superadmin/Scholarships';
 import ManageTeam from './pages/superadmin/ManageTeam';
-import ManageCities from './pages/superadmin/ManageCities';
-import ManageBooks from './pages/superadmin/ManageBooks';
 import PendingAccounts from './pages/superadmin/PendingAccounts';
 import Applications from './pages/admin/Applications';
 import StudentVerification from './pages/admin/StudentVerification';
@@ -127,11 +124,6 @@ export default function App() {
                 <Applications />
               </RequireAuth>
             } />
-            <Route path="fee-waivers" element={
-              <RequireAuth roles={['superadmin']}>
-                <FeeWaivers />
-              </RequireAuth>
-            } />
             <Route path="scholarships" element={
               <RequireAuth roles={['superadmin']}>
                 <Scholarships />
@@ -140,16 +132,6 @@ export default function App() {
             <Route path="manage-team" element={
               <RequireAuth roles={['superadmin']}>
                 <ManageTeam />
-              </RequireAuth>
-            } />
-            <Route path="manage-cities" element={
-              <RequireAuth roles={['superadmin']}>
-                <ManageCities />
-              </RequireAuth>
-            } />
-            <Route path="manage-books" element={
-              <RequireAuth roles={['superadmin']}>
-                <ManageBooks />
               </RequireAuth>
             } />
             <Route path="security" element={<TwoFactorSetup />} />

@@ -49,7 +49,7 @@ router.post('/', authenticate, authorize('student'), async (req, res) => {
   try {
     // ── 1. ID verification check ──────────────────────────────────────────────
     const userRes = await db.query(
-      'SELECT fee_waiver_status, verification_status FROM users WHERE id = $1',
+      'SELECT verification_status FROM users WHERE id = $1',
       [studentId]
     );
     const verStatus = userRes.rows[0]?.verification_status;
@@ -63,16 +63,6 @@ router.post('/', authenticate, authorize('student'), async (req, res) => {
         ? 'Your ID verification was rejected. Re-upload your document from the dashboard.'
         : 'You must verify your ID before enrolling. Go to your dashboard to upload.';
       return res.status(403).json({ error: msg, code });
-    }
-
-    const feeWaiverStatus = userRes.rows[0]?.fee_waiver_status;
-
-    // ── 2. Waiver-pending blocks all enrollment ───────────────────────────────
-    if (feeWaiverStatus === 'pending') {
-      return res.status(403).json({
-        error: 'Your application fee waiver is pending super admin review. You cannot enroll until a decision is made.',
-        code: 'WAIVER_PENDING',
-      });
     }
 
     // ── 3. Class exists and is active ─────────────────────────────────────────
@@ -142,40 +132,35 @@ router.post('/', authenticate, authorize('student'), async (req, res) => {
     let currencySymbol = '';
 
     if (isFirstTime) {
-      if (feeWaiverStatus === 'approved') {
-        appFeeHandled = true;
-        appFeeStatus  = 'waived';
-      } else {
-        // null or 'rejected' — must pay
-        appFeeHandled = false;
-        appFeeStatus  = 'pending_payment';
+      // All first-time students must pay — flat 500 INR auto-converted
+      appFeeHandled = false;
+      appFeeStatus  = 'pending_payment';
 
-        // Fetch global base fee in INR (default 500)
-        const settingsRes = await db.query(
-          `SELECT value FROM global_settings WHERE key = 'app_fee_inr'`
+      // Fetch global base fee in INR (default 500)
+      const settingsRes = await db.query(
+        `SELECT value FROM global_settings WHERE key = 'app_fee_inr'`
+      );
+      const baseINR = parseFloat(settingsRes.rows[0]?.value || '500');
+
+      if (countryCode) {
+        const country = await db.query(
+          `SELECT id, currency_code, currency_symbol, inr_exchange_rate
+           FROM countries WHERE code = $1`,
+          [countryCode.toUpperCase()]
         );
-        const baseINR = parseFloat(settingsRes.rows[0]?.value || '500');
-
-        if (countryCode) {
-          const country = await db.query(
-            `SELECT id, currency_code, currency_symbol, inr_exchange_rate
-             FROM countries WHERE code = $1`,
-            [countryCode.toUpperCase()]
-          );
-          if (country.rows[0]) {
-            countryId      = country.rows[0].id;
-            currencyCode   = country.rows[0].currency_code || 'USD';
-            currencySymbol = country.rows[0].currency_symbol || '';
-            const rate     = parseFloat(country.rows[0].inr_exchange_rate || 0.012);
-            appFeeAmount   = Math.max(1, Math.round(baseINR * rate));
-          }
+        if (country.rows[0]) {
+          countryId      = country.rows[0].id;
+          currencyCode   = country.rows[0].currency_code || 'USD';
+          currencySymbol = country.rows[0].currency_symbol || '';
+          const rate     = parseFloat(country.rows[0].inr_exchange_rate || 0.012);
+          appFeeAmount   = Math.max(1, Math.round(baseINR * rate));
         }
-        // Fallback: ~$6 USD equivalent of 500 INR
-        if (!appFeeAmount) {
-          appFeeAmount   = Math.max(1, Math.round(baseINR * 0.012));
-          currencyCode   = 'USD';
-          currencySymbol = '$';
-        }
+      }
+      // Fallback: ~$6 USD equivalent of 500 INR
+      if (!appFeeAmount) {
+        appFeeAmount   = Math.max(1, Math.round(baseINR * 0.012));
+        currencyCode   = 'USD';
+        currencySymbol = '$';
       }
     }
 
@@ -286,7 +271,6 @@ router.post('/', authenticate, authorize('student'), async (req, res) => {
       ...result.rows[0],
       isFirstTime,
       appFeeRequired:      !appFeeHandled,
-      appFeeWaiverStatus:  feeWaiverStatus,
       appFeeAmount,
       appFeeCurrencyCode:  currencyCode,
       appFeeCurrencySymbol: currencySymbol,
