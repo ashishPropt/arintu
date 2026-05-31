@@ -89,22 +89,39 @@ router.get('/classes', async (req, res) => {
 });
 
 // GET /api/public/application-fee?countryCode=IN
-// Returns the application fee for a given country.
+// Returns the application fee for a given country (flat 500 INR, auto-converted).
 router.get('/application-fee', async (req, res) => {
   const { countryCode } = req.query;
   try {
-    const result = await db.query(
-      `SELECT af.fee, c.currency_code, c.currency_symbol, c.name as country_name
-       FROM application_fees af
-       JOIN countries c ON c.id = af.country_id
-       WHERE c.code = $1`,
-      [(countryCode || 'US').toUpperCase()]
+    // Fetch global base fee
+    const settingsRes = await db.query(
+      `SELECT value FROM global_settings WHERE key = 'app_fee_inr'`
     );
-    if (!result.rows[0]) {
-      return res.json({ fee: 15, currency_code: 'USD', currency_symbol: '$' });
+    const baseINR = parseFloat(settingsRes.rows[0]?.value || '500');
+
+    if (countryCode) {
+      const result = await db.query(
+        `SELECT id, name, currency_code, currency_symbol, inr_exchange_rate
+         FROM countries WHERE code = $1`,
+        [countryCode.toUpperCase()]
+      );
+      if (result.rows[0]) {
+        const rate = parseFloat(result.rows[0].inr_exchange_rate || 0.012);
+        const fee  = Math.max(1, Math.round(baseINR * rate));
+        return res.json({
+          fee,
+          currency_code: result.rows[0].currency_code,
+          currency_symbol: result.rows[0].currency_symbol || '',
+          country_name: result.rows[0].name,
+          base_inr: baseINR,
+        });
+      }
     }
-    res.json(result.rows[0]);
-  } catch {
+    // Default: USD equivalent
+    const usdFee = Math.max(1, Math.round(baseINR * 0.012));
+    res.json({ fee: usdFee, currency_code: 'USD', currency_symbol: '$', base_inr: baseINR });
+  } catch (err) {
+    console.error(err);
     res.status(500).json({ error: 'Server error' });
   }
 });
@@ -152,6 +169,51 @@ router.get('/countries', async (req, res) => {
        ORDER BY name ASC`
     );
     res.json(result.rows);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// GET /api/public/stats — platform stats for public pages
+router.get('/stats', async (_req, res) => {
+  try {
+    const [studentsRes, countriesRes, classesRes] = await Promise.all([
+      db.query(`SELECT COUNT(DISTINCT e.student_id) as total_students
+                FROM enrollments e`),
+      db.query(`SELECT COUNT(DISTINCT co.id) as total_countries
+                FROM users u
+                JOIN countries co ON co.code = u.phone  -- placeholder; derive from users' registration country
+                WHERE u.role = 'student'`),
+      db.query(`SELECT COUNT(*) as total_classes FROM classes WHERE is_active = TRUE`),
+    ]);
+
+    // Simpler: count distinct countries based on user country field if exists, else just count active classes
+    const byCountryRes = await db.query(`
+      SELECT co.name as country_name, co.code as country_code,
+             COUNT(DISTINCT u.id) as student_count
+      FROM users u
+      JOIN class_applications ca ON ca.student_id = u.id
+      JOIN countries co ON co.id = ca.country_id
+      WHERE u.role = 'student' AND ca.payment_status = 'paid'
+      GROUP BY co.id, co.name, co.code
+      ORDER BY student_count DESC
+      LIMIT 20
+    `);
+
+    const totalStudentsRes = await db.query(
+      `SELECT COUNT(DISTINCT student_id) as count FROM enrollments`
+    );
+    const totalClassesRes = await db.query(
+      `SELECT COUNT(*) as count FROM classes WHERE is_active = TRUE`
+    );
+
+    res.json({
+      totalStudents: parseInt(totalStudentsRes.rows[0]?.count || 0),
+      totalClasses:  parseInt(totalClassesRes.rows[0]?.count || 0),
+      totalCountries: byCountryRes.rows.length,
+      byCountry: byCountryRes.rows,
+    });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Server error' });

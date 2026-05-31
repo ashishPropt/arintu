@@ -77,7 +77,24 @@ router.get('/', authenticate, async (req, res) => {
       db.query(query, params),
       db.query(countQuery, countParams),
     ]);
-    res.json({ classes: result.rows, total: parseInt(countResult.rows[0].count) });
+
+    // Attach prerequisite class names
+    const rows = result.rows;
+    const prereqIds = [...new Set(rows.filter(r => r.prerequisite_class_id).map(r => r.prerequisite_class_id))];
+    let prereqNames = {};
+    if (prereqIds.length > 0) {
+      const pRes = await db.query(
+        `SELECT id, name FROM classes WHERE id = ANY($1::uuid[])`,
+        [prereqIds]
+      );
+      pRes.rows.forEach(p => { prereqNames[p.id] = p.name; });
+    }
+    const enriched = rows.map(r => ({
+      ...r,
+      prerequisite_class_name: r.prerequisite_class_id ? (prereqNames[r.prerequisite_class_id] || null) : null,
+    }));
+
+    res.json({ classes: enriched, total: parseInt(countResult.rows[0].count) });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Server error' });
@@ -94,13 +111,18 @@ router.post(
     const errors = validationResult(req);
     if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
 
-    const { name, description, subject, level, maxStudents, enrollmentDeadline, allowLateEnrollment } = req.body;
+    const { name, description, subject, level, maxStudents, enrollmentDeadline, allowLateEnrollment,
+            prerequisiteClassId, requiresQuiz, prerequisiteNotes } = req.body;
     try {
       const result = await db.query(
-        `INSERT INTO classes (name, description, admin_id, subject, level, max_students, enrollment_deadline, allow_late_enrollment)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+        `INSERT INTO classes (name, description, admin_id, subject, level, max_students,
+                             enrollment_deadline, allow_late_enrollment,
+                             prerequisite_class_id, requires_quiz, prerequisite_notes)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
          RETURNING *`,
-        [name, description, req.user.id, subject, level, maxStudents || 30, enrollmentDeadline || null, allowLateEnrollment || false]
+        [name, description, req.user.id, subject, level, maxStudents || 30,
+         enrollmentDeadline || null, allowLateEnrollment || false,
+         prerequisiteClassId || null, requiresQuiz || false, prerequisiteNotes || null]
       );
       res.status(201).json(result.rows[0]);
     } catch {
@@ -137,23 +159,48 @@ router.get('/:id', authenticate, async (req, res) => {
 
 // PUT /api/classes/:id
 router.put('/:id', authenticate, authorize('admin', 'superadmin'), async (req, res) => {
-  const { name, description, subject, level, maxStudents, isActive, enrollmentDeadline, allowLateEnrollment } = req.body;
+  const { name, description, subject, level, maxStudents, isActive, enrollmentDeadline, allowLateEnrollment,
+          prerequisiteClassId, requiresQuiz, prerequisiteNotes } = req.body;
+  // Prerequisite fields: use NULL when explicitly provided as null/empty, or existing value
+  const hasPrereq = Object.prototype.hasOwnProperty.call(req.body, 'prerequisiteClassId');
+  const prereqVal = hasPrereq ? (prerequisiteClassId || null) : undefined;
+  const hasNotes  = Object.prototype.hasOwnProperty.call(req.body, 'prerequisiteNotes');
+  const notesVal  = hasNotes ? (prerequisiteNotes || null) : undefined;
+
   try {
+    // Build dynamic SET to avoid COALESCE issues with explicit null
+    const sets = [
+      'name = COALESCE($1, name)',
+      'description = COALESCE($2, description)',
+      'subject = COALESCE($3, subject)',
+      'level = COALESCE($4, level)',
+      'max_students = COALESCE($5, max_students)',
+      'is_active = COALESCE($6, is_active)',
+      'enrollment_deadline = COALESCE($7, enrollment_deadline)',
+      'allow_late_enrollment = COALESCE($8, allow_late_enrollment)',
+      'requires_quiz = COALESCE($9, requires_quiz)',
+      'updated_at = NOW()',
+    ];
+    const params = [name, description, subject, level, maxStudents, isActive,
+                    enrollmentDeadline, allowLateEnrollment, requiresQuiz];
+
+    let idx = params.length + 1;
+    if (hasPrereq) { sets.push(`prerequisite_class_id = $${idx++}`); params.push(prereqVal); }
+    if (hasNotes)  { sets.push(`prerequisite_notes = $${idx++}`); params.push(notesVal); }
+
+    params.push(req.params.id, req.user.role, req.user.id);
+    const whereIdx = idx; idx += 2;
+
     const result = await db.query(
-      `UPDATE classes SET
-         name = COALESCE($1, name), description = COALESCE($2, description),
-         subject = COALESCE($3, subject), level = COALESCE($4, level),
-         max_students = COALESCE($5, max_students), is_active = COALESCE($6, is_active),
-         enrollment_deadline = COALESCE($7, enrollment_deadline),
-         allow_late_enrollment = COALESCE($8, allow_late_enrollment),
-         updated_at = NOW()
-       WHERE id = $9 AND ($10 = 'superadmin' OR admin_id = $11)
+      `UPDATE classes SET ${sets.join(', ')}
+       WHERE id = $${whereIdx} AND ($${whereIdx+1} = 'superadmin' OR admin_id = $${whereIdx+2})
        RETURNING *`,
-      [name, description, subject, level, maxStudents, isActive, enrollmentDeadline, allowLateEnrollment, req.params.id, req.user.role, req.user.id]
+      params
     );
     if (!result.rows[0]) return res.status(404).json({ error: 'Class not found' });
     res.json(result.rows[0]);
-  } catch {
+  } catch (err) {
+    console.error(err);
     res.status(500).json({ error: 'Server error' });
   }
 });

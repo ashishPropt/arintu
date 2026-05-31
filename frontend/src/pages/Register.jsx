@@ -11,10 +11,21 @@ const ROLES = [
   { value: 'admin',   label: 'Admin',   desc: 'Manage classes and students (pending approval)', color: 'purple' },
 ];
 
+const CONTACT_PREFS = [
+  { value: 'email',     label: 'Email' },
+  { value: 'phone',     label: 'Phone' },
+  { value: 'whatsapp',  label: 'WhatsApp' },
+  { value: 'any',       label: 'Any' },
+];
+
 export default function Register() {
   const { login } = useAuth();
   const navigate = useNavigate();
-  const [form, setForm] = useState({ name: '', email: '', password: '', role: 'student' });
+  const [form, setForm] = useState({
+    name: '', email: '', password: '', role: 'student',
+    parentName: '', parentEmail: '', parentPhone: '',
+    contactPreference: 'email',
+  });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [pending, setPending] = useState(false);
@@ -24,17 +35,20 @@ export default function Register() {
   const submit = async (e) => {
     e.preventDefault();
     setError('');
+
+    // Frontend validation for parent fields
+    if (form.role === 'student') {
+      if (!form.parentName.trim()) return setError('Parent/guardian name is required');
+      if (!form.parentEmail.trim()) return setError('Parent/guardian email is required');
+    }
+
     setLoading(true);
     try {
       const res = await authApi.register(form);
       if (res.data.pending) {
-        // Admin or teacher — needs superadmin approval
         setPending(true);
       } else {
-        // Student or parent — auto-logged in
-        // Need to manually set the token and user from the register response
         localStorage.setItem('arintu_token', res.data.token);
-        // Force a re-login to populate AuthContext properly
         await login(form.email, form.password);
         navigate('/app/dashboard');
       }
@@ -47,6 +61,7 @@ export default function Register() {
 
   const selectedRole = ROLES.find((r) => r.value === form.role);
   const needsApproval = form.role === 'teacher' || form.role === 'admin';
+  const isStudent = form.role === 'student';
 
   if (pending) {
     return (
@@ -115,6 +130,7 @@ export default function Register() {
               </div>
             )}
 
+            {/* Student info */}
             <div>
               <label className="block text-xs font-medium text-gray-700 mb-1">Full Name</label>
               <input
@@ -150,6 +166,70 @@ export default function Register() {
                 minLength={6}
               />
             </div>
+
+            {/* Contact preference */}
+            <div>
+              <label className="block text-xs font-medium text-gray-700 mb-1">Preferred contact method</label>
+              <select
+                className="input"
+                value={form.contactPreference}
+                onChange={(e) => set('contactPreference', e.target.value)}
+              >
+                {CONTACT_PREFS.map((p) => (
+                  <option key={p.value} value={p.value}>{p.label}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* Parent/Guardian info — required for students */}
+            {isStudent && (
+              <div className="border border-blue-100 rounded-xl p-4 bg-blue-50 space-y-3">
+                <div>
+                  <p className="text-xs font-semibold text-blue-800 mb-1">Parent / Guardian Information</p>
+                  <p className="text-xs text-blue-600">Required for student accounts. Your parent/guardian will receive updates about your progress.</p>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">
+                    Parent / Guardian Name <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    className="input"
+                    placeholder="Parent or guardian full name"
+                    value={form.parentName}
+                    onChange={(e) => set('parentName', e.target.value)}
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">
+                    Parent / Guardian Email <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="email"
+                    className="input"
+                    placeholder="parent@example.com"
+                    value={form.parentEmail}
+                    onChange={(e) => set('parentEmail', e.target.value)}
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">
+                    Parent / Guardian Phone <span className="text-xs text-gray-400">(optional)</span>
+                  </label>
+                  <input
+                    type="tel"
+                    className="input"
+                    placeholder="+1 555 000 0000"
+                    value={form.parentPhone}
+                    onChange={(e) => set('parentPhone', e.target.value)}
+                  />
+                </div>
+              </div>
+            )}
 
             <button type="submit" disabled={loading} className="btn-primary w-full mt-1">
               {loading ? 'Creating account…' : needsApproval ? `Request ${selectedRole?.label} Account` : 'Create Account'}

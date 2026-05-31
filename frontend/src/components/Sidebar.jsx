@@ -5,12 +5,12 @@ import Logo from './Logo';
 const navByRole = {
   superadmin: [
     { to: '/app/dashboard',       label: 'Dashboard',        icon: HomeIcon },
+    { to: '/app/security',        label: 'Security (2FA)',   icon: ShieldIcon },
     { to: '/app/pending-accounts',label: 'Pending Accounts', icon: PendingIcon },
     { to: '/app/users',           label: 'Users',            icon: UsersIcon },
     { to: '/app/countries',       label: 'Countries & Fees', icon: GlobeIcon },
     { to: '/app/pricing',         label: 'Pricing',          icon: TagIcon },
     { to: '/app/classes',         label: 'All Classes',      icon: BookIcon },
-    { to: '/app/worksheets',      label: 'Worksheets',       icon: WorksheetIcon },
     { to: '/app/schedules',       label: 'Schedules',        icon: CalIcon },
     { to: '/app/applications',    label: 'Applications',     icon: ClipboardIcon },
     { to: '/app/verification',    label: 'ID Verification',  icon: ShieldIcon },
@@ -22,8 +22,8 @@ const navByRole = {
   ],
   admin: [
     { to: '/app/dashboard',    label: 'Dashboard',       icon: HomeIcon },
+    { to: '/app/security',     label: 'Security (2FA)',  icon: ShieldIcon },
     { to: '/app/classes',      label: 'Classes',         icon: BookIcon },
-    { to: '/app/worksheets',   label: 'Worksheets',      icon: WorksheetIcon },
     { to: '/app/schedules',    label: 'Schedules',       icon: CalIcon },
     { to: '/app/users',        label: 'Users',           icon: UsersIcon },
     { to: '/app/applications', label: 'Applications',    icon: ClipboardIcon },
@@ -32,14 +32,14 @@ const navByRole = {
   teacher: [
     { to: '/app/dashboard',  label: 'Dashboard',  icon: HomeIcon },
     { to: '/app/classes',    label: 'My Classes', icon: BookIcon },
-    { to: '/app/worksheets', label: 'Worksheets', icon: WorksheetIcon },
     { to: '/app/schedules',  label: 'Schedule',   icon: CalIcon },
+    { to: '/app/security',   label: 'Security',   icon: ShieldIcon },
   ],
   student: [
     { to: '/app/dashboard',  label: 'Dashboard',  icon: HomeIcon },
     { to: '/app/classes',    label: 'My Classes', icon: BookIcon },
-    { to: '/app/worksheets', label: 'Worksheets', icon: WorksheetIcon },
     { to: '/app/schedules',  label: 'Schedule',   icon: CalIcon },
+    { to: '/app/security',   label: 'Security',   icon: ShieldIcon },
   ],
 };
 

@@ -23,6 +23,7 @@ import StudentVerification from './pages/admin/StudentVerification';
 import ForgotPassword from './pages/ForgotPassword';
 import ResetPassword from './pages/ResetPassword';
 import Register from './pages/Register';
+import TwoFactorSetup from './pages/TwoFactorSetup';
 
 // Public content pages
 import Team from './pages/public/Team';
@@ -151,6 +152,7 @@ export default function App() {
                 <ManageBooks />
               </RequireAuth>
             } />
+            <Route path="security" element={<TwoFactorSetup />} />
           </Route>
 
           <Route path="*" element={<Navigate to="/" replace />} />

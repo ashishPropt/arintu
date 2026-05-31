@@ -2,6 +2,7 @@ const express = require('express');
 const db = require('../database/db');
 const { authenticate, authorize } = require('../middleware/auth');
 const { createNotification, notifyClassMembers } = require('../services/notifications');
+const emailSvc = require('../services/email');
 
 const router = express.Router();
 
@@ -78,6 +79,33 @@ router.post('/', authenticate, authorize('student'), async (req, res) => {
     const cls = await db.query('SELECT * FROM classes WHERE id = $1 AND is_active = TRUE', [classId]);
     if (!cls.rows[0]) return res.status(404).json({ error: 'Class not found or inactive' });
 
+    // ── 3b. Prerequisite check ────────────────────────────────────────────────
+    if (cls.rows[0].prerequisite_class_id) {
+      const prereqClassId = cls.rows[0].prerequisite_class_id;
+      // Check enrollment in prerequisite class
+      const prereqEnrolled = await db.query(
+        'SELECT id FROM enrollments WHERE class_id = $1 AND student_id = $2',
+        [prereqClassId, studentId]
+      );
+      if (!prereqEnrolled.rows[0]) {
+        // Check manual admin override
+        const override = await db.query(
+          `SELECT id FROM prerequisite_approvals
+           WHERE class_id = $1 AND student_id = $2 AND approved = TRUE`,
+          [classId, studentId]
+        );
+        if (!override.rows[0]) {
+          const prereqCls = await db.query('SELECT name FROM classes WHERE id = $1', [prereqClassId]);
+          return res.status(403).json({
+            error: `This class requires completion of "${prereqCls.rows[0]?.name || 'a prerequisite course'}". Please enrol and complete that course first, or contact your admin with documentation for a manual approval.`,
+            code: 'PREREQUISITE_REQUIRED',
+            prerequisiteClassId: prereqClassId,
+            prerequisiteClassName: prereqCls.rows[0]?.name,
+          });
+        }
+      }
+    }
+
     // ── 4. No duplicate application ───────────────────────────────────────────
     const existing = await db.query(
       `SELECT id, status, payment_status, class_fee_status
@@ -105,7 +133,7 @@ router.post('/', authenticate, authorize('student'), async (req, res) => {
     );
     const isFirstTime = parseInt(enrollCount.rows[0].count) === 0;
 
-    // ── 6. Application fee determination ─────────────────────────────────────
+    // ── 6. Application fee determination (flat 500 INR, auto-converted) ─────
     let appFeeHandled = !isFirstTime;   // returning students skip app fee
     let appFeeStatus  = 'not_required'; // for returning students
     let appFeeAmount  = null;
@@ -121,25 +149,32 @@ router.post('/', authenticate, authorize('student'), async (req, res) => {
         // null or 'rejected' — must pay
         appFeeHandled = false;
         appFeeStatus  = 'pending_payment';
+
+        // Fetch global base fee in INR (default 500)
+        const settingsRes = await db.query(
+          `SELECT value FROM global_settings WHERE key = 'app_fee_inr'`
+        );
+        const baseINR = parseFloat(settingsRes.rows[0]?.value || '500');
+
         if (countryCode) {
           const country = await db.query(
-            `SELECT c.id, c.currency_code, c.currency_symbol, af.fee
-             FROM countries c LEFT JOIN application_fees af ON af.country_id = c.id
-             WHERE c.code = $1`,
+            `SELECT id, currency_code, currency_symbol, inr_exchange_rate
+             FROM countries WHERE code = $1`,
             [countryCode.toUpperCase()]
           );
           if (country.rows[0]) {
             countryId      = country.rows[0].id;
-            currencyCode   = country.rows[0].currency_code;
+            currencyCode   = country.rows[0].currency_code || 'USD';
             currencySymbol = country.rows[0].currency_symbol || '';
-            appFeeAmount   = parseFloat(country.rows[0].fee ?? 15);
+            const rate     = parseFloat(country.rows[0].inr_exchange_rate || 0.012);
+            appFeeAmount   = Math.max(1, Math.round(baseINR * rate));
           }
         }
+        // Fallback: ~$6 USD equivalent of 500 INR
         if (!appFeeAmount) {
-          const usd = await db.query(
-            `SELECT af.fee FROM application_fees af JOIN countries c ON c.id = af.country_id WHERE c.code = 'US'`
-          );
-          appFeeAmount = parseFloat(usd.rows[0]?.fee ?? 15);
+          appFeeAmount   = Math.max(1, Math.round(baseINR * 0.012));
+          currencyCode   = 'USD';
+          currencySymbol = '$';
         }
       }
     }
@@ -535,6 +570,8 @@ router.put('/:id/scholarship', authenticate, authorize('admin', 'superadmin'), a
          'Scholarship request update',
          `Your scholarship request for "${app.class_name}" was not approved. You can still enrol by paying the full class fee.`]
       );
+      const studRevoked = await db.query('SELECT name, email FROM users WHERE id = $1', [app.student_id]);
+      emailSvc.sendScholarshipRevoked(studRevoked.rows[0].email, studRevoked.rows[0].name, app.class_name).catch(() => {});
       return res.json(result.rows[0]);
     } catch (err) {
       console.error(err);
@@ -605,6 +642,8 @@ router.put('/:id/scholarship', authenticate, authorize('admin', 'superadmin'), a
       `INSERT INTO notifications (user_id, title, message, type) VALUES ($1,$2,$3,'info')`,
       [app.student_id, 'Scholarship decision', msg]
     );
+    const studScholar = await db.query('SELECT name, email FROM users WHERE id = $1', [app.student_id]);
+    emailSvc.sendScholarshipAwarded(studScholar.rows[0].email, studScholar.rows[0].name, app.class_name, type, discountPct).catch(() => {});
 
     res.json(result.rows[0]);
   } catch (err) {
@@ -649,6 +688,10 @@ router.put('/:id/approve', authenticate, authorize('admin', 'superadmin'), async
       metadata: { classId: class_id },
     });
 
+    // Email notification
+    const studentInfo = await db.query('SELECT name, email FROM users WHERE id = $1', [student_id]);
+    emailSvc.sendApplicationApproved(studentInfo.rows[0].email, studentInfo.rows[0].name, cls.rows[0]?.name).catch(() => {});
+
     res.json(app.rows[0]);
   } catch (err) {
     await client.query('ROLLBACK');
@@ -672,6 +715,8 @@ router.put('/:id/reject', authenticate, authorize('admin', 'superadmin'), async 
 
   const { class_id, student_id } = result.rows[0];
   const cls = await db.query('SELECT name FROM classes WHERE id = $1', [class_id]);
+  const studentRej = await db.query('SELECT name, email FROM users WHERE id = $1', [student_id]);
+  emailSvc.sendApplicationRejected(studentRej.rows[0].email, studentRej.rows[0].name, cls.rows[0]?.name, notes).catch(() => {});
   await createNotification({
     userId: student_id,
     title: 'Application update',

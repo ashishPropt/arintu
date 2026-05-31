@@ -29,6 +29,12 @@ export const auth = {
   forgotPassword: (email) => api.post('/auth/forgot-password', { email }),
   resetPassword: (token, newPassword) => api.post('/auth/reset-password', { token, newPassword }),
   verifyResetToken: (token) => api.get('/auth/verify-reset-token', { params: { token } }),
+  // 2FA
+  twoFaStatus: () => api.get('/auth/2fa/status'),
+  twoFaSetup: () => api.post('/auth/2fa/setup'),
+  twoFaEnable: (code) => api.post('/auth/2fa/enable', { code }),
+  twoFaDisable: (password, code) => api.post('/auth/2fa/disable', { password, code }),
+  twoFaVerify: (pendingToken, code) => api.post('/auth/2fa/verify', { pendingToken, code }),
 };
 
 export const users = {

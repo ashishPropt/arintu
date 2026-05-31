@@ -1,6 +1,7 @@
 const express = require('express');
 const db = require('../database/db');
 const { authenticate, authorize } = require('../middleware/auth');
+const emailSvc = require('../services/email');
 
 const router = express.Router();
 
@@ -131,6 +132,14 @@ router.put('/:userId/review', authenticate, authorize('superadmin'), async (req,
         msg,
       ]
     );
+
+    // Email notification
+    const studentInfo = await db.query('SELECT name, email FROM users WHERE id = $1', [req.params.userId]);
+    if (action === 'approve') {
+      emailSvc.sendFeeWaiverApproved(studentInfo.rows[0].email, studentInfo.rows[0].name).catch(() => {});
+    } else {
+      emailSvc.sendFeeWaiverRejected(studentInfo.rows[0].email, studentInfo.rows[0].name, notes).catch(() => {});
+    }
 
     res.json({ message: `Waiver ${status}` });
   } catch (err) {
