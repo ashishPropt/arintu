@@ -39,7 +39,7 @@ async function createMeeting({ topic, startTime, duration = 60, agenda = '' }) {
         participant_video: true,
         join_before_host: false,
         waiting_room: true,
-        auto_recording: 'none',
+        auto_recording: 'cloud',
       },
     },
     { headers: { Authorization: `Bearer ${token}` } }
