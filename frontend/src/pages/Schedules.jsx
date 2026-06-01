@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { schedules as schedulesApi, classes as classesApi } from '../api';
+
 import { useAuth } from '../contexts/AuthContext';
 import Modal from '../components/Modal';
 import { format, startOfWeek, addDays, isSameDay } from 'date-fns';
@@ -74,6 +75,18 @@ export default function Schedules() {
     }
   };
 
+  const bulkZoom = async (classId) => {
+    try {
+      const res = await schedulesApi.bulkZoom(classId);
+      load();
+      const { updated, failed } = res.data;
+      if (updated === 0) alert('No upcoming sessions without Zoom found for this class.');
+      else alert(`✅ Zoom enabled for ${updated} session${updated !== 1 ? 's' : ''}${failed > 0 ? ` (${failed} failed — check Zoom credentials)` : ''}. Students have been notified.`);
+    } catch (err) {
+      alert(err.response?.data?.error || 'Failed to set up Zoom. Make sure Zoom credentials are configured on the server.');
+    }
+  };
+
   return (
     <div>
       <div className="flex items-center justify-between mb-6">
@@ -121,6 +134,7 @@ export default function Schedules() {
           classes={myClasses}
           onClose={() => setShowCreate(false)}
           onCreated={() => { setShowCreate(false); load(); }}
+          onBulkZoom={bulkZoom}
         />
       )}
     </div>
@@ -156,55 +170,59 @@ function ScheduleCard({ schedule: s, isAdmin, canCreateZoom, onCreateZoom, onDel
   );
 }
 
-function CreateScheduleModal({ classes, onClose, onCreated }) {
+function CreateScheduleModal({ classes, onClose, onCreated, onBulkZoom }) {
   const [form, setForm] = useState({
     classId: '', title: '', startTime: '', endTime: '',
     recurringType: 'once', repeatUntil: '', notes: '',
   });
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
+  const [enableZoom, setEnableZoom] = useState(false);
+  const [loading,    setLoading]    = useState(false);
+  const [error,      setError]      = useState('');
+  const [zoomBusy,   setZoomBusy]   = useState(false);
 
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
 
-  const isRecurring = form.recurringType !== 'once';
+  const isRecurring    = form.recurringType !== 'once';
+  const minRepeatUntil = form.startTime ? form.startTime.split('T')[0] : undefined;
 
-  // Live session count
   const sessionCount = useMemo(
     () => countOccurrences(form.startTime, form.recurringType, form.repeatUntil),
     [form.startTime, form.recurringType, form.repeatUntil]
   );
 
-  // Min date for "Repeat until" = the day of the first session
-  const minRepeatUntil = form.startTime
-    ? form.startTime.split('T')[0]
-    : undefined;
+  const freqLabel = {
+    once: 'session', daily: 'daily sessions', weekly: 'weekly sessions',
+    biweekly: 'bi-weekly sessions', monthly: 'monthly sessions',
+  };
 
   const submit = async (e) => {
     e.preventDefault();
-    setLoading(true);
-    setError('');
+    setLoading(true); setError('');
     try {
       const payload = {
         classId:       form.classId,
-        title:         form.title,
+        title:         form.title || undefined,
         startTime:     new Date(form.startTime).toISOString(),
         endTime:       new Date(form.endTime).toISOString(),
         recurringType: form.recurringType,
-        notes:         form.notes,
+        notes:         form.notes || undefined,
         repeatUntil:   (isRecurring && form.repeatUntil)
                          ? new Date(form.repeatUntil + 'T23:59:59').toISOString()
                          : undefined,
       };
       await schedulesApi.create(payload);
+
+      if (enableZoom && form.classId && onBulkZoom) {
+        setZoomBusy(true);
+        await onBulkZoom(form.classId);
+        setZoomBusy(false);
+      }
+
       onCreated();
     } catch (err) {
       setError(err.response?.data?.error || 'Failed to create schedule');
+      setZoomBusy(false);
     } finally { setLoading(false); }
-  };
-
-  const freqLabel = {
-    once: 'session', daily: 'daily sessions', weekly: 'weekly sessions',
-    biweekly: 'bi-weekly sessions', monthly: 'monthly sessions',
   };
 
   return (
@@ -223,11 +241,11 @@ function CreateScheduleModal({ classes, onClose, onCreated }) {
 
         {/* Title */}
         <div>
-          <label className="block text-xs font-medium text-gray-700 mb-1">Session Title (optional)</label>
+          <label className="block text-xs font-medium text-gray-700 mb-1">Session Title <span className="text-gray-400 font-normal">(optional)</span></label>
           <input className="input" placeholder="e.g. Chapter 3 Review" value={form.title} onChange={(e) => set('title', e.target.value)} />
         </div>
 
-        {/* Start / End times */}
+        {/* Start / End */}
         <div className="grid grid-cols-2 gap-3">
           <div>
             <label className="block text-xs font-medium text-gray-700 mb-1">First session starts *</label>
@@ -254,8 +272,6 @@ function CreateScheduleModal({ classes, onClose, onCreated }) {
               <option value="monthly">Monthly</option>
             </select>
           </div>
-
-          {/* Repeat Until — only shown for recurring */}
           {isRecurring && (
             <div>
               <label className="block text-xs font-medium text-gray-700 mb-1">Repeat until *</label>
@@ -272,13 +288,11 @@ function CreateScheduleModal({ classes, onClose, onCreated }) {
           <div className={`flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm font-medium ${
             sessionCount > 1 ? 'bg-brand-50 text-brand-700 border border-brand-100' : 'bg-gray-50 text-gray-600 border border-gray-100'
           }`}>
-            <span className="text-lg">{sessionCount > 1 ? '📅' : '📆'}</span>
+            <span className="text-base">{sessionCount > 1 ? '📅' : '📆'}</span>
             <span>
-              {sessionCount === 1
-                ? 'Creates 1 session'
-                : `Creates ${sessionCount} ${freqLabel[form.recurringType]}`}
+              {sessionCount === 1 ? 'Creates 1 session' : `Creates ${sessionCount} ${freqLabel[form.recurringType]}`}
               {sessionCount > 1 && form.repeatUntil && (
-                <span className="font-normal text-brand-500">
+                <span className="font-normal opacity-70">
                   {' '}· ends {new Date(form.repeatUntil).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
                 </span>
               )}
@@ -292,14 +306,31 @@ function CreateScheduleModal({ classes, onClose, onCreated }) {
           <textarea className="input" rows={2} value={form.notes} onChange={(e) => set('notes', e.target.value)} />
         </div>
 
+        {/* Zoom toggle */}
+        <label className={`flex items-start gap-3 p-3 rounded-xl border-2 cursor-pointer transition-colors ${
+          enableZoom ? 'border-purple-300 bg-purple-50' : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
+        }`}>
+          <input
+            type="checkbox"
+            className="mt-0.5 w-4 h-4 accent-purple-600 shrink-0"
+            checked={enableZoom}
+            onChange={(e) => setEnableZoom(e.target.checked)}
+          />
+          <div>
+            <p className="text-sm font-semibold text-gray-800">🎥 Enable Zoom for all sessions</p>
+            <p className="text-xs text-gray-500 mt-0.5 leading-relaxed">
+              Creates a Zoom meeting for every upcoming session of the selected class (including any
+              previously scheduled sessions without Zoom). Students will be notified with the join link.
+            </p>
+          </div>
+        </label>
+
         <div className="flex justify-end gap-2 pt-1">
           <button type="button" onClick={onClose} className="btn-secondary">Cancel</button>
-          <button type="submit" disabled={loading} className="btn-primary">
-            {loading
-              ? 'Creating…'
-              : sessionCount > 1
-                ? `Create ${sessionCount} sessions`
-                : 'Create session'}
+          <button type="submit" disabled={loading || zoomBusy} className="btn-primary">
+            {loading || zoomBusy
+              ? (zoomBusy ? 'Setting up Zoom…' : 'Creating…')
+              : `${sessionCount > 1 ? `Create ${sessionCount} sessions` : 'Create session'}${enableZoom ? ' + Zoom' : ''}`}
           </button>
         </div>
       </form>

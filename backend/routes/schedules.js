@@ -155,6 +155,72 @@ router.post(
   }
 );
 
+// POST /api/schedules/bulk-zoom
+// Creates Zoom meetings for every upcoming session of a class that doesn't have one yet.
+// Called after schedule creation (when "Enable Zoom for all sessions" is checked) or
+// from the Schedules page to retroactively set up Zoom for an entire class.
+router.post('/bulk-zoom', authenticate, authorize('admin', 'superadmin', 'teacher'), async (req, res) => {
+  const { classId } = req.body;
+  if (!classId) return res.status(400).json({ error: 'classId is required' });
+
+  // Teacher can only do this for their assigned class
+  if (req.user.role === 'teacher') {
+    const assigned = await db.query(
+      'SELECT 1 FROM teacher_assignments WHERE class_id = $1 AND teacher_id = $2',
+      [classId, req.user.id]
+    );
+    if (!assigned.rows[0]) return res.status(403).json({ error: 'You are not assigned to this class' });
+  }
+
+  const sessions = await db.query(
+    `SELECT cs.*, c.name as class_name
+     FROM class_schedules cs
+     JOIN classes c ON c.id = cs.class_id
+     WHERE cs.class_id = $1 AND cs.zoom_meeting_id IS NULL AND cs.start_time > NOW()
+     ORDER BY cs.start_time ASC`,
+    [classId]
+  );
+
+  if (sessions.rows.length === 0) {
+    return res.json({ updated: 0, skipped: 0, message: 'No upcoming sessions without Zoom found' });
+  }
+
+  const updated = [];
+  const failed  = [];
+
+  for (const s of sessions.rows) {
+    try {
+      const durationMinutes = Math.max(
+        1,
+        Math.round((new Date(s.end_time) - new Date(s.start_time)) / 60000)
+      );
+      const meeting = await zoomService.createMeeting({
+        topic:     s.title || s.class_name,
+        startTime: s.start_time,
+        duration:  durationMinutes,
+      });
+      await db.query(
+        `UPDATE class_schedules SET
+           zoom_meeting_id = $1, zoom_join_url = $2, zoom_start_url = $3, zoom_password = $4,
+           updated_at = NOW()
+         WHERE id = $5`,
+        [meeting.meetingId, meeting.joinUrl, meeting.startUrl, meeting.password, s.id]
+      );
+      await notifyZoomCreated(s.id, classId, meeting.joinUrl);
+      updated.push({ id: s.id, zoom_join_url: meeting.joinUrl });
+    } catch (err) {
+      failed.push({ id: s.id, error: err.message });
+    }
+  }
+
+  res.json({
+    updated: updated.length,
+    failed:  failed.length,
+    results: updated,
+    errors:  failed,
+  });
+});
+
 // GET /api/schedules/:id
 router.get('/:id', authenticate, async (req, res) => {
   const result = await db.query(

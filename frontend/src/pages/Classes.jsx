@@ -1,5 +1,5 @@
-import { useState, useEffect, useCallback } from 'react';
-import { classes as classesApi, users, countries as countriesApi, applications, publicApi } from '../api';
+import { useState, useEffect, useCallback, useMemo } from 'react';
+import { classes as classesApi, schedules as schedulesApi, users, countries as countriesApi, applications, publicApi } from '../api';
 import { useAuth } from '../contexts/AuthContext';
 import Modal from '../components/Modal';
 
@@ -959,120 +959,320 @@ function AdminClassModal({ classId, onClose, onChanged, teachers, students, coun
 
 const LEVELS = ['Beginner', 'Intermediate', 'Advanced'];
 
-// ── Create class modal ────────────────────────────────────────────────────────
+/** Mirror of the backend generateOccurrences — used for live preview. */
+function countOccurrences(startTime, recurringType, repeatUntil) {
+  if (!startTime || recurringType === 'once' || !repeatUntil) return 1;
+  const start = new Date(startTime);
+  const until = new Date(repeatUntil);
+  if (isNaN(start) || isNaN(until) || until <= start) return 1;
+  function next(d) {
+    const n = new Date(d);
+    switch (recurringType) {
+      case 'daily':    n.setDate(n.getDate() + 1);   break;
+      case 'weekly':   n.setDate(n.getDate() + 7);   break;
+      case 'biweekly': n.setDate(n.getDate() + 14);  break;
+      case 'monthly':  n.setMonth(n.getMonth() + 1); break;
+      default: return null;
+    }
+    return n;
+  }
+  let count = 1;
+  let cursor = next(start);
+  while (cursor && cursor <= until && count < 365) { count++; cursor = next(cursor); }
+  return count;
+}
+
+// ── Create class modal — 3-step: details → schedule-prompt → schedule form ────
 function CreateClassModal({ onClose, onCreated }) {
-  const [form, setForm] = useState({
-    name: '', description: '', subject: '', level: '', maxStudents: 30,
+  // ── step 1: class details ─────────────────────────────────────────────────
+  const [step,       setStep]       = useState('details'); // 'details' | 'prompt' | 'schedule'
+  const [created,    setCreated]    = useState(null);       // the newly created class object
+
+  const [form,       setForm]       = useState({ name: '', description: '', subject: '', level: '', maxStudents: 30 });
+  const [price,      setPrice]      = useState('');
+  const [prereqIds,  setPrereqIds]  = useState([]);
+  const [allClasses, setAllClasses] = useState([]);
+  const [loading,    setLoading]    = useState(false);
+  const [error,      setError]      = useState('');
+
+  // ── step 3: schedule form ─────────────────────────────────────────────────
+  const [sched, setSched] = useState({
+    title: '', startTime: '', endTime: '',
+    recurringType: 'once', repeatUntil: '', notes: '',
   });
-  const [price,          setPrice]          = useState('');
-  const [prereqIds,      setPrereqIds]      = useState([]); // selected prerequisite class IDs
-  const [allClasses,     setAllClasses]     = useState([]); // for prerequisite picker
-  const [loading,        setLoading]        = useState(false);
-  const [error,          setError]          = useState('');
+  const [enableZoom,   setEnableZoom]   = useState(false);
+  const [schedLoading, setSchedLoading] = useState(false);
+  const [schedError,   setSchedError]   = useState('');
+  const [zoomResult,   setZoomResult]   = useState(null); // { updated, failed }
 
-  const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
+  const setF = (k, v) => setForm((f) => ({ ...f, [k]: v }));
+  const setS = (k, v) => setSched((s) => ({ ...s, [k]: v }));
 
-  // Load all active classes for the prerequisite picker
+  const isRecurring  = sched.recurringType !== 'once';
+  const sessionCount = useMemo(
+    () => countOccurrences(sched.startTime, sched.recurringType, sched.repeatUntil),
+    [sched.startTime, sched.recurringType, sched.repeatUntil]
+  );
+
+  // Load all classes for prerequisite picker
   useEffect(() => {
-    classesApi.list({ limit: 200 })
-      .then((r) => setAllClasses(r.data.classes || []))
-      .catch(() => {});
+    classesApi.list({ limit: 200 }).then((r) => setAllClasses(r.data.classes || [])).catch(() => {});
   }, []);
 
-  const togglePrereq = (id) => {
-    setPrereqIds((prev) =>
-      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
-    );
-  };
+  const togglePrereq = (id) =>
+    setPrereqIds((p) => p.includes(id) ? p.filter((x) => x !== id) : [...p, id]);
 
-  const submit = async (e) => {
+  // ── Submit step 1: create the class ──────────────────────────────────────
+  const submitDetails = async (e) => {
     e.preventDefault();
     if (!form.level) { setError('Please select a level.'); return; }
-    setLoading(true);
-    setError('');
+    setLoading(true); setError('');
     try {
       const res = await classesApi.create({ ...form, prerequisiteClassIds: prereqIds });
       const classId = res.data.id;
       if (price && parseFloat(price) > 0) {
         await classesApi.setPricing(classId, { price: parseFloat(price) });
       }
-      onCreated();
+      setCreated(res.data);
+      setStep('prompt');
     } catch (err) {
       setError(err.response?.data?.error || 'Failed to create class');
     } finally { setLoading(false); }
   };
 
-  // Classes available as prerequisites (exclude any already picked)
-  const availableClasses = allClasses.filter((c) => !prereqIds.includes(c.id));
+  // ── Submit step 3: create schedule (+ optional Zoom) ─────────────────────
+  const submitSchedule = async (e) => {
+    e.preventDefault();
+    setSchedLoading(true); setSchedError(''); setZoomResult(null);
+    try {
+      const payload = {
+        classId:       created.id,
+        title:         sched.title || undefined,
+        startTime:     new Date(sched.startTime).toISOString(),
+        endTime:       new Date(sched.endTime).toISOString(),
+        recurringType: sched.recurringType,
+        notes:         sched.notes || undefined,
+        repeatUntil:   (isRecurring && sched.repeatUntil)
+                         ? new Date(sched.repeatUntil + 'T23:59:59').toISOString()
+                         : undefined,
+      };
+      await schedulesApi.create(payload);
 
+      if (enableZoom) {
+        const zr = await schedulesApi.bulkZoom(created.id);
+        setZoomResult(zr.data);
+      }
+      // Short pause so user sees the result, then close
+      setTimeout(onCreated, enableZoom ? 1400 : 0);
+    } catch (err) {
+      setSchedError(err.response?.data?.error || 'Failed to create schedule');
+    } finally { setSchedLoading(false); }
+  };
+
+  const availableForPrereq = allClasses.filter((c) => !prereqIds.includes(c.id));
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Step 2: schedule-prompt
+  // ─────────────────────────────────────────────────────────────────────────
+  if (step === 'prompt') {
+    return (
+      <Modal open title="Class Created!" onClose={onCreated} size="sm">
+        <div className="space-y-5">
+          <div className="flex items-start gap-3 p-4 bg-green-50 border border-green-100 rounded-xl">
+            <span className="text-3xl">🎉</span>
+            <div>
+              <p className="text-sm font-semibold text-green-800">{created.name}</p>
+              <p className="text-xs text-green-700 mt-0.5">Your class has been created successfully.</p>
+            </div>
+          </div>
+          <p className="text-sm text-gray-700 font-medium text-center">Would you like to schedule sessions for this class now?</p>
+          <div className="grid grid-cols-2 gap-3">
+            <button
+              onClick={() => setStep('schedule')}
+              className="flex flex-col items-center gap-1.5 p-4 rounded-xl border-2 border-brand-200 bg-brand-50 hover:border-brand-400 hover:bg-brand-100 transition-colors text-brand-700"
+            >
+              <span className="text-2xl">📅</span>
+              <span className="text-sm font-semibold">Schedule now</span>
+              <span className="text-xs text-brand-500 text-center">Set up sessions &amp; optionally enable Zoom</span>
+            </button>
+            <button
+              onClick={onCreated}
+              className="flex flex-col items-center gap-1.5 p-4 rounded-xl border-2 border-gray-200 bg-gray-50 hover:border-gray-300 hover:bg-gray-100 transition-colors text-gray-600"
+            >
+              <span className="text-2xl">⏭</span>
+              <span className="text-sm font-semibold">Skip for now</span>
+              <span className="text-xs text-gray-400 text-center">You can schedule from the Schedules page later</span>
+            </button>
+          </div>
+        </div>
+      </Modal>
+    );
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Step 3: schedule form
+  // ─────────────────────────────────────────────────────────────────────────
+  if (step === 'schedule') {
+    const freqLabel = { once: 'session', daily: 'daily sessions', weekly: 'weekly sessions', biweekly: 'bi-weekly sessions', monthly: 'monthly sessions' };
+
+    return (
+      <Modal open title={`Schedule — ${created.name}`} onClose={onCreated} size="lg">
+        <form onSubmit={submitSchedule} className="space-y-4">
+          {schedError && <div className="p-3 bg-red-50 text-red-600 rounded-lg text-sm">{schedError}</div>}
+
+          {zoomResult && (
+            <div className="p-3 bg-purple-50 border border-purple-100 rounded-xl text-sm text-purple-700 flex items-center gap-2">
+              <span>✅</span>
+              <span>Zoom enabled for <strong>{zoomResult.updated}</strong> session{zoomResult.updated !== 1 ? 's' : ''}{zoomResult.failed > 0 ? ` (${zoomResult.failed} failed)` : ''}.</span>
+            </div>
+          )}
+
+          {/* Session title */}
+          <div>
+            <label className="block text-xs font-medium text-gray-700 mb-1">Session Title <span className="text-gray-400 font-normal">(optional)</span></label>
+            <input className="input" placeholder="e.g. Chapter 1 Intro" value={sched.title} onChange={(e) => setS('title', e.target.value)} />
+          </div>
+
+          {/* Start / End */}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-medium text-gray-700 mb-1">First session starts *</label>
+              <input type="datetime-local" className="input" value={sched.startTime}
+                onChange={(e) => setS('startTime', e.target.value)} required />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-700 mb-1">First session ends *</label>
+              <input type="datetime-local" className="input" value={sched.endTime}
+                onChange={(e) => setS('endTime', e.target.value)} required />
+            </div>
+          </div>
+
+          {/* Frequency */}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-medium text-gray-700 mb-1">Frequency</label>
+              <select className="input" value={sched.recurringType}
+                onChange={(e) => { setS('recurringType', e.target.value); if (e.target.value === 'once') setS('repeatUntil', ''); }}>
+                <option value="once">One-time only</option>
+                <option value="daily">Daily</option>
+                <option value="weekly">Weekly</option>
+                <option value="biweekly">Bi-weekly</option>
+                <option value="monthly">Monthly</option>
+              </select>
+            </div>
+            {isRecurring && (
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">Repeat until *</label>
+                <input type="date" className="input" value={sched.repeatUntil}
+                  min={sched.startTime ? sched.startTime.split('T')[0] : undefined}
+                  onChange={(e) => setS('repeatUntil', e.target.value)} required />
+              </div>
+            )}
+          </div>
+
+          {/* Live session count preview */}
+          {sched.startTime && sched.endTime && (
+            <div className={`flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm font-medium ${
+              sessionCount > 1 ? 'bg-brand-50 text-brand-700 border border-brand-100' : 'bg-gray-50 text-gray-600 border border-gray-100'
+            }`}>
+              <span className="text-base">{sessionCount > 1 ? '📅' : '📆'}</span>
+              <span>
+                {sessionCount === 1
+                  ? 'Creates 1 session'
+                  : `Creates ${sessionCount} ${freqLabel[sched.recurringType]}`}
+                {sessionCount > 1 && sched.repeatUntil && (
+                  <span className="font-normal opacity-70">
+                    {' '}· ends {new Date(sched.repeatUntil).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                  </span>
+                )}
+              </span>
+            </div>
+          )}
+
+          {/* Notes */}
+          <div>
+            <label className="block text-xs font-medium text-gray-700 mb-1">Notes</label>
+            <textarea className="input" rows={2} value={sched.notes} onChange={(e) => setS('notes', e.target.value)} />
+          </div>
+
+          {/* Zoom toggle */}
+          <label className={`flex items-start gap-3 p-3 rounded-xl border-2 cursor-pointer transition-colors ${
+            enableZoom ? 'border-purple-300 bg-purple-50' : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
+          }`}>
+            <input
+              type="checkbox"
+              className="mt-0.5 w-4 h-4 accent-purple-600 shrink-0"
+              checked={enableZoom}
+              onChange={(e) => setEnableZoom(e.target.checked)}
+            />
+            <div>
+              <p className="text-sm font-semibold text-gray-800">🎥 Enable Zoom for all sessions</p>
+              <p className="text-xs text-gray-500 mt-0.5 leading-relaxed">
+                A Zoom meeting will be automatically created for each session scheduled above.
+                Enrolled students will receive the join link via notification.
+              </p>
+            </div>
+          </label>
+
+          <div className="flex gap-2 pt-1">
+            <button type="button" onClick={onCreated} className="btn-secondary">Skip scheduling</button>
+            <button type="submit" disabled={schedLoading} className="btn-primary flex-1">
+              {schedLoading
+                ? (enableZoom ? 'Creating sessions & Zoom…' : 'Creating sessions…')
+                : `Create ${sessionCount} session${sessionCount !== 1 ? 's' : ''}${enableZoom ? ' + Zoom' : ''} →`}
+            </button>
+          </div>
+        </form>
+      </Modal>
+    );
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Step 1: class details form
+  // ─────────────────────────────────────────────────────────────────────────
   return (
     <Modal open title="Create Class" onClose={onClose} size="lg">
-      <form onSubmit={submit} className="space-y-4">
+      <form onSubmit={submitDetails} className="space-y-4">
         {error && <div className="p-3 bg-red-50 text-red-600 rounded-lg text-sm">{error}</div>}
 
         <div className="grid grid-cols-2 gap-3">
-          {/* Class name */}
           <div className="col-span-2">
             <label className="block text-xs font-medium text-gray-700 mb-1">Class Name *</label>
-            <input className="input" value={form.name} onChange={(e) => set('name', e.target.value)} required />
+            <input className="input" value={form.name} onChange={(e) => setF('name', e.target.value)} required />
           </div>
-
-          {/* Subject */}
           <div>
             <label className="block text-xs font-medium text-gray-700 mb-1">Subject</label>
-            <input className="input" value={form.subject} onChange={(e) => set('subject', e.target.value)} />
+            <input className="input" value={form.subject} onChange={(e) => setF('subject', e.target.value)} />
           </div>
-
-          {/* Level dropdown */}
           <div>
             <label className="block text-xs font-medium text-gray-700 mb-1">Level *</label>
-            <select
-              className="input"
-              value={form.level}
-              onChange={(e) => set('level', e.target.value)}
-              required
-            >
+            <select className="input" value={form.level} onChange={(e) => setF('level', e.target.value)} required>
               <option value="">Select level…</option>
               {LEVELS.map((l) => <option key={l} value={l}>{l}</option>)}
             </select>
           </div>
-
-          {/* Description */}
           <div className="col-span-2">
             <label className="block text-xs font-medium text-gray-700 mb-1">Description</label>
-            <textarea className="input" rows={2} value={form.description} onChange={(e) => set('description', e.target.value)} />
+            <textarea className="input" rows={2} value={form.description} onChange={(e) => setF('description', e.target.value)} />
           </div>
-
-          {/* Max students */}
           <div>
             <label className="block text-xs font-medium text-gray-700 mb-1">Max Students</label>
-            <input type="number" className="input" min="1" value={form.maxStudents} onChange={(e) => set('maxStudents', e.target.value)} />
+            <input type="number" className="input" min="1" value={form.maxStudents} onChange={(e) => setF('maxStudents', e.target.value)} />
           </div>
-
-          {/* Class price — single global price */}
           <div>
             <label className="block text-xs font-medium text-gray-700 mb-1">Class Price (USD)</label>
-            <input
-              type="number"
-              className="input"
-              min="0"
-              step="any"
-              placeholder="0 = free"
-              value={price}
-              onChange={(e) => setPrice(e.target.value)}
-            />
+            <input type="number" className="input" min="0" step="any" placeholder="0 = free"
+              value={price} onChange={(e) => setPrice(e.target.value)} />
           </div>
         </div>
 
-        {/* Prerequisites — shown after level selected, searchable multi-pick */}
+        {/* Prerequisites */}
         {form.level && (
           <div>
             <label className="block text-xs font-medium text-gray-700 mb-1">
               Prerequisites
-              <span className="text-gray-400 font-normal ml-1">— select classes students must have completed</span>
+              <span className="text-gray-400 font-normal ml-1">— classes students must have completed first</span>
             </label>
-
-            {/* Selected chips */}
             {prereqIds.length > 0 && (
               <div className="flex flex-wrap gap-1.5 mb-2">
                 {prereqIds.map((id) => {
@@ -1086,17 +1286,11 @@ function CreateClassModal({ onClose, onCreated }) {
                 })}
               </div>
             )}
-
-            {/* Scrollable picker */}
-            {availableClasses.length > 0 ? (
+            {availableForPrereq.length > 0 ? (
               <div className="border border-gray-200 rounded-xl overflow-hidden max-h-36 overflow-y-auto">
-                {availableClasses.map((c) => (
-                  <button
-                    key={c.id}
-                    type="button"
-                    onClick={() => togglePrereq(c.id)}
-                    className="w-full flex items-center gap-2 px-3 py-2 text-left text-sm hover:bg-brand-50 hover:text-brand-700 transition-colors border-b border-gray-50 last:border-0"
-                  >
+                {availableForPrereq.map((c) => (
+                  <button key={c.id} type="button" onClick={() => togglePrereq(c.id)}
+                    className="w-full flex items-center gap-2 px-3 py-2 text-left text-sm hover:bg-brand-50 hover:text-brand-700 transition-colors border-b border-gray-50 last:border-0">
                     <span className="text-gray-300 text-xs">＋</span>
                     <span className="flex-1">{c.name}</span>
                     {c.level && <span className="text-xs text-gray-400">{c.level}</span>}
@@ -1106,7 +1300,7 @@ function CreateClassModal({ onClose, onCreated }) {
             ) : prereqIds.length === 0 ? (
               <p className="text-xs text-gray-400 italic">No other classes available to set as prerequisites.</p>
             ) : (
-              <p className="text-xs text-gray-400 italic">All available classes are already selected.</p>
+              <p className="text-xs text-gray-400 italic">All available classes selected.</p>
             )}
           </div>
         )}
@@ -1114,7 +1308,7 @@ function CreateClassModal({ onClose, onCreated }) {
         <div className="flex justify-end gap-2 pt-2">
           <button type="button" onClick={onClose} className="btn-secondary">Cancel</button>
           <button type="submit" disabled={loading} className="btn-primary">
-            {loading ? 'Creating…' : 'Create Class'}
+            {loading ? 'Creating…' : 'Create Class →'}
           </button>
         </div>
       </form>

@@ -69,6 +69,7 @@ export const schedules = {
   update: (id, data) => api.put(`/schedules/${id}`, data),
   remove: (id) => api.delete(`/schedules/${id}`),
   createZoom: (id) => api.post(`/schedules/${id}/zoom`),
+  bulkZoom: (classId) => api.post('/schedules/bulk-zoom', { classId }),
 };
 
 export const notifications = {
