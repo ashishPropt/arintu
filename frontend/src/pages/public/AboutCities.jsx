@@ -41,15 +41,7 @@ export default function AboutCities() {
         an active presence — teachers, student groups, or partner institutions.
       </p>
 
-      {cities.length === 0 ? (
-        <div className="text-center py-12 mb-14">
-          <div className="text-5xl mb-4">🏙️</div>
-          <h2 className="text-lg font-semibold text-gray-800 mb-2">Expanding soon</h2>
-          <p className="text-sm text-gray-500 max-w-sm mx-auto">
-            We're actively growing our city network. Check back soon to see where Arintu is coming to next.
-          </p>
-        </div>
-      ) : (
+      {cities.length > 0 && (
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5 mb-16">
           {cities.map((city) => (
             <div
