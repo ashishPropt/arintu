@@ -25,7 +25,6 @@ import TwoFactorSetup from './pages/TwoFactorSetup';
 // Public content pages
 import Team from './pages/public/Team';
 import AboutCities from './pages/public/AboutCities';
-import AboutCountries from './pages/public/AboutCountries';
 import HQAddress from './pages/public/HQAddress';
 import History from './pages/public/History';
 import Jobs from './pages/public/Jobs';
@@ -67,7 +66,7 @@ export default function App() {
             <Route path="/" element={<SmartLanding />} />
             <Route path="/about/team"      element={<Team />} />
             <Route path="/about/cities"    element={<AboutCities />} />
-            <Route path="/about/countries" element={<AboutCountries />} />
+            <Route path="/about/countries" element={<Navigate to="/about/cities" replace />} />
             <Route path="/about/hq"        element={<HQAddress />} />
             <Route path="/about/history"   element={<History />} />
             <Route path="/about/jobs"      element={<Jobs />} />

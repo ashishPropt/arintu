@@ -4,13 +4,12 @@ import { useAuth } from '../contexts/AuthContext';
 import Logo from './Logo';
 
 const aboutLinks = [
-  { to: '/about/team',      label: 'Team' },
-  { to: '/about/cities',    label: 'Cities' },
-  { to: '/about/countries', label: 'Countries' },
-  { to: '/about/hq',        label: 'HQ Address' },
-  { to: '/about/history',   label: 'History' },
-  { to: '/about/jobs',      label: 'Jobs' },
-  { to: '/about/faq',       label: 'FAQ' },
+  { to: '/about/team',    label: 'Team' },
+  { to: '/about/cities',  label: 'Cities' },
+  { to: '/about/hq',      label: 'HQ Address' },
+  { to: '/about/history', label: 'History' },
+  { to: '/about/jobs',    label: 'Jobs' },
+  { to: '/about/faq',     label: 'FAQ' },
 ];
 
 const communityLinks = [

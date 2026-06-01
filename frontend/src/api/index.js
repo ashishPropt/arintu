@@ -153,6 +153,7 @@ export const publicApi = {
   cities: () => api.get('/public/cities'),
   countries: () => api.get('/public/countries'),
   books: () => api.get('/public/books'),
+  studentCountries: () => api.get('/public/student-countries'),
 };
 
 export const content = {

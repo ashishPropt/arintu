@@ -220,6 +220,25 @@ router.get('/stats', async (_req, res) => {
   }
 });
 
+// GET /api/public/student-countries — distinct countries derived from student user metadata
+router.get('/student-countries', async (_req, res) => {
+  try {
+    const result = await db.query(
+      `SELECT co.id, co.name, co.code,
+              COUNT(DISTINCT u.id) AS student_count
+       FROM users u
+       JOIN countries co ON co.id = u.country_id
+       WHERE u.role = 'student' AND u.country_id IS NOT NULL
+       GROUP BY co.id, co.name, co.code
+       ORDER BY student_count DESC, co.name ASC`
+    );
+    res.json(result.rows);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
 // GET /api/public/books — approved book submissions only
 router.get('/books', async (req, res) => {
   try {
