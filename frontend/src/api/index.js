@@ -187,4 +187,36 @@ export const mathwave = {
   results: (studentId, classId) => api.get(`/mathwave/results/${studentId}`, { params: { classId } }),
 };
 
+export const lms = {
+  // Curriculum
+  curriculum: (classId) => api.get(`/lms/curriculum/${classId}`),
+  createModule: (data) => api.post('/lms/modules', data),
+  updateModule: (id, data) => api.put(`/lms/modules/${id}`, data),
+  deleteModule: (id) => api.delete(`/lms/modules/${id}`),
+  createLesson: (data) => api.post('/lms/lessons', data),
+  updateLesson: (id, data) => api.put(`/lms/lessons/${id}`, data),
+  deleteLesson: (id) => api.delete(`/lms/lessons/${id}`),
+  // Progress
+  markProgress: (lessonId, completed) => api.post('/lms/progress', { lessonId, completed }),
+  myProgress: (classId) => api.get(`/lms/progress/${classId}`),
+  // Quizzes
+  quizForLesson: (lessonId) => api.get(`/lms/quizzes/lesson/${lessonId}`),
+  createQuiz: (data) => api.post('/lms/quizzes', data),
+  updateQuiz: (id, data) => api.put(`/lms/quizzes/${id}`, data),
+  deleteQuiz: (id) => api.delete(`/lms/quizzes/${id}`),
+  submitQuiz: (id, answers) => api.post(`/lms/quizzes/${id}/attempt`, { answers }),
+  // Assignments
+  assignments: (classId) => api.get(`/lms/assignments/${classId}`),
+  createAssignment: (data) => api.post('/lms/assignments', data),
+  updateAssignment: (id, data) => api.put(`/lms/assignments/${id}`, data),
+  deleteAssignment: (id) => api.delete(`/lms/assignments/${id}`),
+  submitAssignment: (id, data) => api.post(`/lms/assignments/${id}/submit`, data),
+  assignmentSubmissions: (id) => api.get(`/lms/assignments/${id}/submissions`),
+  gradeSubmission: (id, data) => api.put(`/lms/submissions/${id}/grade`, data),
+  // Announcements
+  announcements: (classId) => api.get(`/lms/announcements/${classId}`),
+  createAnnouncement: (data) => api.post('/lms/announcements', data),
+  deleteAnnouncement: (id) => api.delete(`/lms/announcements/${id}`),
+};
+
 export default api;
