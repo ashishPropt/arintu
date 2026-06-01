@@ -43,13 +43,21 @@ async function createStripeSession({ stripe, email, amount, currency, name, desc
 // Phase 1: application fee (first-time students only)
 // Phase 2: class tuition fee (all students after app fee is settled)
 router.post('/', authenticate, authorize('student'), async (req, res) => {
-  const { classId, countryCode } = req.body;
+  const { classId } = req.body;
   const studentId = req.user.id;
 
   try {
-    // ── 1. ID verification check ──────────────────────────────────────────────
+    // ── 1. Load student record (verification status + stored country) ─────────
     const userRes = await db.query(
-      'SELECT verification_status FROM users WHERE id = $1',
+      `SELECT u.verification_status,
+              u.country_id,
+              co.code            AS country_code,
+              co.currency_code,
+              co.currency_symbol,
+              co.inr_exchange_rate
+       FROM users u
+       LEFT JOIN countries co ON co.id = u.country_id
+       WHERE u.id = $1`,
       [studentId]
     );
     const verStatus = userRes.rows[0]?.verification_status;
@@ -154,19 +162,14 @@ router.post('/', authenticate, authorize('student'), async (req, res) => {
       );
       const baseINR = parseFloat(settingsRes.rows[0]?.value || '500');
 
-      if (countryCode) {
-        const country = await db.query(
-          `SELECT id, currency_code, currency_symbol, inr_exchange_rate
-           FROM countries WHERE code = $1`,
-          [countryCode.toUpperCase()]
-        );
-        if (country.rows[0]) {
-          countryId      = country.rows[0].id;
-          currencyCode   = country.rows[0].currency_code || 'USD';
-          currencySymbol = country.rows[0].currency_symbol || '';
-          const rate     = parseFloat(country.rows[0].inr_exchange_rate || 0.012);
-          appFeeAmount   = Math.max(1, Math.round(baseINR * rate));
-        }
+      // Use country stored on the student's profile (set at registration)
+      const studentCountry = userRes.rows[0];
+      if (studentCountry?.country_id) {
+        countryId      = studentCountry.country_id;
+        currencyCode   = studentCountry.currency_code   || 'USD';
+        currencySymbol = studentCountry.currency_symbol || '';
+        const rate     = parseFloat(studentCountry.inr_exchange_rate || 0.012);
+        appFeeAmount   = Math.max(1, Math.round(baseINR * rate));
       }
       // Fallback: ~$6 USD equivalent of 500 INR
       if (!appFeeAmount) {

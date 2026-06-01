@@ -467,38 +467,33 @@ function StudentClassModal({ classId, onClose }) {
   );
 }
 
-// ── Apply modal — country selector ────────────────────────────────────────────
+// ── Apply modal — auto-derives country from student profile ──────────────────
 function ApplyModal({ classId, className, onClose, onBack, onApplied }) {
-  const [countries,   setCountries]   = useState([]);
-  const [countryCode, setCountryCode] = useState('');
-  const [feeInfo,     setFeeInfo]     = useState(null);
-  const [loading,     setLoading]     = useState(false);
-  const [error,       setError]       = useState('');
+  const { user }                      = useAuth();
+  const [feeInfo,  setFeeInfo]        = useState(null);
+  const [feeReady, setFeeReady]       = useState(false);
+  const [loading,  setLoading]        = useState(false);
+  const [error,    setError]          = useState('');
 
+  // Auto-fetch application fee using the country stored on the user's profile
   useEffect(() => {
-    publicApi.countries().then((r) => setCountries(r.data || [])).catch(() => {});
-  }, []);
-
-  useEffect(() => {
-    if (!countryCode) { setFeeInfo(null); return; }
-    publicApi.applicationFee(countryCode)
-      .then((r) => setFeeInfo(r.data))
-      .catch(() => setFeeInfo(null));
-  }, [countryCode]);
+    if (!user?.country_code) { setFeeReady(true); return; }
+    publicApi.applicationFee(user.country_code)
+      .then((r) => { setFeeInfo(r.data); setFeeReady(true); })
+      .catch(() => setFeeReady(true));
+  }, [user?.country_code]);
 
   const submit = async (e) => {
     e.preventDefault();
     setLoading(true);
     setError('');
     try {
-      const res = await applications.apply(classId, countryCode || null);
+      const res = await applications.apply(classId, null);
       onApplied(res.data);
     } catch (err) {
       const code = err.response?.data?.code;
       const msg  = err.response?.data?.error || 'Failed to submit application';
-      if (code === 'WAIVER_PENDING') {
-        setError('Your fee waiver request is pending super admin review. You cannot apply until a decision is made.');
-      } else if (code === 'VERIFICATION_PENDING') {
+      if (code === 'VERIFICATION_PENDING') {
         setError('Your ID verification is still under review. Please wait for it to be approved before applying.');
       } else if (code === 'VERIFICATION_REQUIRED') {
         setError('You must verify your ID before applying. Go to your dashboard to upload your ID document.');
@@ -513,44 +508,48 @@ function ApplyModal({ classId, className, onClose, onBack, onApplied }) {
       <form onSubmit={submit} className="space-y-4">
         {error && <div className="p-3 bg-red-50 text-red-600 rounded-lg text-sm">{error}</div>}
 
-        <div>
-          <label className="block text-xs font-medium text-gray-700 mb-1">Your Country *</label>
-          <select
-            className="input"
-            value={countryCode}
-            onChange={(e) => setCountryCode(e.target.value)}
-            required
-          >
-            <option value="">Select your country…</option>
-            {countries.map((c) => (
-              <option key={c.id} value={c.code}>
-                {c.name} ({c.currency_symbol} {c.currency_code})
-              </option>
-            ))}
-          </select>
-          <p className="text-xs text-gray-400 mt-1">Used to determine your one-time application fee.</p>
-        </div>
+        {/* Country pill — read-only, derived from profile */}
+        {user?.country_name && (
+          <div className="flex items-center gap-2 p-3 rounded-xl bg-gray-50 border border-gray-100 text-sm text-gray-700">
+            <span className="text-base">🌍</span>
+            <div>
+              <span className="font-medium">{user.country_name}</span>
+              {user.currency_code && (
+                <span className="text-gray-400 ml-1">· {user.currency_symbol}{user.currency_code}</span>
+              )}
+            </div>
+          </div>
+        )}
 
-        {feeInfo && feeInfo.fee > 0 && (
+        {!feeReady && (
+          <div className="text-xs text-gray-400 text-center py-2">Checking application fee…</div>
+        )}
+
+        {feeReady && feeInfo && feeInfo.fee > 0 && (
           <div className="p-3 rounded-xl bg-amber-50 border border-amber-100 text-sm text-amber-700">
             <strong>One-time application fee: </strong>
             {feeInfo.currency_symbol}{Number(feeInfo.fee).toLocaleString()} {feeInfo.currency_code}
             <p className="text-xs mt-1 text-amber-600">
-              This is a one-time fee waived on all future class applications.
-              You can request a waiver from your dashboard if you need financial assistance.
+              This is a one-time fee. It is waived on all your future class applications.
             </p>
           </div>
         )}
 
-        {feeInfo && (!feeInfo.fee || feeInfo.fee === 0) && (
+        {feeReady && (!feeInfo || !feeInfo.fee || feeInfo.fee === 0) && (
           <div className="p-3 rounded-xl bg-green-50 border border-green-100 text-sm text-green-700">
-            No application fee for your country.
+            ✓ No application fee required.
+          </div>
+        )}
+
+        {!user?.country_name && feeReady && (
+          <div className="p-3 rounded-xl bg-blue-50 border border-blue-100 text-xs text-blue-700">
+            No country is set on your profile. Update your profile to see applicable fees.
           </div>
         )}
 
         <div className="flex gap-2 pt-1">
           <button type="button" onClick={onBack} className="btn-secondary flex-1">← Back</button>
-          <button type="submit" disabled={loading} className="btn-primary flex-1">
+          <button type="submit" disabled={loading || !feeReady} className="btn-primary flex-1">
             {loading ? 'Submitting…' : 'Continue →'}
           </button>
         </div>

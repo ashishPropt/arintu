@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { auth as authApi } from '../api';
+import { auth as authApi, publicApi } from '../api';
 import { useAuth } from '../contexts/AuthContext';
 import Logo from '../components/Logo';
 
@@ -25,10 +25,16 @@ export default function Register() {
     name: '', email: '', password: '', role: 'student',
     parentName: '', parentEmail: '', parentPhone: '',
     contactPreference: 'email',
+    countryId: '',
   });
+  const [countries, setCountries] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [pending, setPending] = useState(false);
+
+  useEffect(() => {
+    publicApi.countries().then((r) => setCountries(r.data || [])).catch(() => {});
+  }, []);
 
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
 
@@ -179,6 +185,26 @@ export default function Register() {
                   <option key={p.value} value={p.value}>{p.label}</option>
                 ))}
               </select>
+            </div>
+
+            {/* Country */}
+            <div>
+              <label className="block text-xs font-medium text-gray-700 mb-1">Country</label>
+              <select
+                className="input"
+                value={form.countryId}
+                onChange={(e) => set('countryId', e.target.value)}
+              >
+                <option value="">Select your country…</option>
+                {countries.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name}
+                  </option>
+                ))}
+              </select>
+              <p className="text-xs text-gray-400 mt-1">
+                Used to determine applicable fees. You can update this later from your profile.
+              </p>
             </div>
 
             {/* Parent/Guardian info — required for students */}

@@ -107,7 +107,7 @@ router.post(
     const {
       name, email: emailAddr, password, role: requestedRole = 'student', parentId,
       parentName, parentEmail, parentPhone,
-      contactPreference,
+      contactPreference, countryId,
     } = req.body;
     const role = requestedRole;
 
@@ -141,14 +141,15 @@ router.post(
 
       const result = await db.query(
         `INSERT INTO users (name, email, password_hash, role, is_active, account_status, parent_id,
-                            parent_name, parent_email, parent_phone, contact_preference)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+                            parent_name, parent_email, parent_phone, contact_preference, country_id)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
          RETURNING id, email, name, role, account_status`,
         [name, emailAddr, hash, role, isActive, accountStatus, validatedParentId,
          role === 'student' ? (parentName || null) : null,
          role === 'student' ? (parentEmail || null) : null,
          role === 'student' ? (parentPhone || null) : null,
-         contactPreference || 'email']
+         contactPreference || 'email',
+         countryId || null]
       );
       const user = result.rows[0];
 
@@ -178,8 +179,15 @@ router.get('/me', authenticate, async (req, res) => {
     `SELECT u.id, u.email, u.name, u.role, u.phone, u.avatar_url, u.region_id,
             u.fee_waiver_status, u.verification_status, u.account_status,
             u.id_document_uploaded_at, u.verification_notes,
-            r.name as region_name
-     FROM users u LEFT JOIN regions r ON r.id = u.region_id
+            u.country_id,
+            co.code  AS country_code,
+            co.name  AS country_name,
+            co.currency_code,
+            co.currency_symbol,
+            r.name   AS region_name
+     FROM users u
+     LEFT JOIN regions   r  ON r.id  = u.region_id
+     LEFT JOIN countries co ON co.id = u.country_id
      WHERE u.id = $1`,
     [req.user.id]
   );
