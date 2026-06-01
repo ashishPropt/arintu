@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { classes, schedules, verification as verificationApi } from '../../api';
+import { classes, schedules, verification as verificationApi, auth as authApi, publicApi } from '../../api';
 import { useAuth } from '../../contexts/AuthContext';
 import { Link } from 'react-router-dom';
 import { format } from 'date-fns';
@@ -34,6 +34,9 @@ export default function StudentDashboard() {
 
       {/* ID Verification Card */}
       <VerificationCard status={verificationStatus} notes={user?.verification_notes} onUploaded={reloadUser} />
+
+      {/* Country Card */}
+      <CountryCard user={user} onSaved={reloadUser} />
 
       <div className="grid md:grid-cols-2 gap-4 mb-4">
         <div className="card p-4 flex items-center gap-3">
@@ -84,6 +87,109 @@ export default function StudentDashboard() {
         )}
       </div>
 
+    </div>
+  );
+}
+
+function CountryCard({ user, onSaved }) {
+  const [editing,   setEditing]   = useState(false);
+  const [countries, setCountries] = useState([]);
+  const [selected,  setSelected]  = useState('');
+  const [saving,    setSaving]    = useState(false);
+  const [error,     setError]     = useState('');
+
+  // Open edit mode — load countries and pre-fill current value
+  const startEdit = () => {
+    setError('');
+    setSelected(user?.country_id || '');
+    if (countries.length === 0) {
+      publicApi.countries().then((r) => setCountries(r.data || [])).catch(() => {});
+    }
+    setEditing(true);
+  };
+
+  const save = async () => {
+    if (!selected) { setError('Please select a country'); return; }
+    setSaving(true);
+    setError('');
+    try {
+      await authApi.updateProfile({ countryId: selected });
+      await onSaved(); // refresh auth context → user object updates everywhere
+      setEditing(false);
+    } catch {
+      setError('Failed to save. Please try again.');
+    } finally {
+      setSaving(false); }
+  };
+
+  // Country already set — show a compact pill with an Edit link
+  if (user?.country_name && !editing) {
+    return (
+      <div className="mb-5 flex items-center justify-between p-4 rounded-xl bg-gray-50 border border-gray-100">
+        <div className="flex items-center gap-2 text-sm text-gray-700">
+          <span className="text-base">🌍</span>
+          <span className="font-medium">{user.country_name}</span>
+          {user.currency_code && (
+            <span className="text-gray-400">· {user.currency_symbol}{user.currency_code}</span>
+          )}
+        </div>
+        <button onClick={startEdit} className="text-xs text-brand-600 hover:underline">
+          Change country
+        </button>
+      </div>
+    );
+  }
+
+  // No country set — show a prompt card (or edit form)
+  if (!editing) {
+    return (
+      <div className="mb-5 p-4 rounded-xl bg-amber-50 border border-amber-100">
+        <div className="flex items-start gap-3 mb-3">
+          <span className="text-2xl">🌍</span>
+          <div className="flex-1">
+            <p className="text-sm font-semibold text-amber-800">Set your country</p>
+            <p className="text-xs text-amber-700 mt-0.5">
+              Your country is used to calculate the one-time application fee when you apply to a class.
+            </p>
+          </div>
+        </div>
+        <button
+          onClick={startEdit}
+          className="text-xs font-medium text-amber-800 bg-white border border-amber-200 rounded-lg px-3 py-1.5 hover:bg-amber-50 transition-colors"
+        >
+          Set country →
+        </button>
+      </div>
+    );
+  }
+
+  // Edit form
+  return (
+    <div className="mb-5 p-4 rounded-xl bg-gray-50 border border-gray-200 space-y-3">
+      <p className="text-sm font-semibold text-gray-800">
+        {user?.country_name ? 'Change country' : 'Set your country'}
+      </p>
+      {error && <p className="text-xs text-red-600">{error}</p>}
+      <select
+        className="input"
+        value={selected}
+        onChange={(e) => setSelected(e.target.value)}
+      >
+        <option value="">Select your country…</option>
+        {countries.map((c) => (
+          <option key={c.id} value={c.id}>
+            {c.name} {c.currency_code ? `(${c.currency_symbol}${c.currency_code})` : ''}
+          </option>
+        ))}
+      </select>
+      <div className="flex gap-2">
+        <button onClick={() => setEditing(false)} className="btn-secondary flex-1 text-xs py-1.5">
+          Cancel
+        </button>
+        <button onClick={save} disabled={saving} className="btn-primary flex-1 text-xs py-1.5">
+          {saving ? 'Saving…' : 'Save'}
+        </button>
+      </div>
     </div>
   );
 }

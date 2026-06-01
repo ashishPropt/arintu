@@ -35,6 +35,7 @@ export const auth = {
   twoFaEnable: (code) => api.post('/auth/2fa/enable', { code }),
   twoFaDisable: (password, code) => api.post('/auth/2fa/disable', { password, code }),
   twoFaVerify: (pendingToken, code) => api.post('/auth/2fa/verify', { pendingToken, code }),
+  updateProfile: (data) => api.put('/auth/profile', data),
 };
 
 export const users = {

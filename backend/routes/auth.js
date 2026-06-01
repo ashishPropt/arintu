@@ -194,6 +194,39 @@ router.get('/me', authenticate, async (req, res) => {
   res.json(result.rows[0]);
 });
 
+// ── PUT /api/auth/profile ─────────────────────────────────────────────────────
+// Lets any authenticated user update their own profile fields (country for now)
+router.put('/profile', authenticate, async (req, res) => {
+  const { countryId } = req.body;
+  try {
+    await db.query(
+      'UPDATE users SET country_id = $1, updated_at = NOW() WHERE id = $2',
+      [countryId || null, req.user.id]
+    );
+    // Return the freshly-joined row so the client can update its auth context
+    const result = await db.query(
+      `SELECT u.id, u.email, u.name, u.role, u.phone, u.avatar_url, u.region_id,
+              u.fee_waiver_status, u.verification_status, u.account_status,
+              u.id_document_uploaded_at, u.verification_notes,
+              u.country_id,
+              co.code  AS country_code,
+              co.name  AS country_name,
+              co.currency_code,
+              co.currency_symbol,
+              r.name   AS region_name
+       FROM users u
+       LEFT JOIN regions   r  ON r.id  = u.region_id
+       LEFT JOIN countries co ON co.id = u.country_id
+       WHERE u.id = $1`,
+      [req.user.id]
+    );
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
 // ── POST /api/auth/change-password ────────────────────────────────────────────
 router.post(
   '/change-password',
