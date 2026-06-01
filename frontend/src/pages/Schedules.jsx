@@ -37,7 +37,8 @@ export default function Schedules() {
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [week, setWeek] = useState(startOfWeek(new Date(), { weekStartsOn: 1 }));
-  const [showCreate, setShowCreate] = useState(false);
+  const [showCreate,    setShowCreate]    = useState(false);
+  const [showZoomSetup, setShowZoomSetup] = useState(false);
   const [myClasses, setMyClasses] = useState([]);
 
   // Admins + teachers can create sessions; admins also get the delete button
@@ -76,15 +77,9 @@ export default function Schedules() {
   };
 
   const bulkZoom = async (classId) => {
-    try {
-      const res = await schedulesApi.bulkZoom(classId);
-      load();
-      const { updated, failed } = res.data;
-      if (updated === 0) alert('No upcoming sessions without Zoom found for this class.');
-      else alert(`✅ Zoom enabled for ${updated} session${updated !== 1 ? 's' : ''}${failed > 0 ? ` (${failed} failed — check Zoom credentials)` : ''}. Students have been notified.`);
-    } catch (err) {
-      alert(err.response?.data?.error || 'Failed to set up Zoom. Make sure Zoom credentials are configured on the server.');
-    }
+    const res = await schedulesApi.bulkZoom(classId);
+    load();
+    return res.data; // let callers handle feedback
   };
 
   return (
@@ -100,6 +95,12 @@ export default function Schedules() {
           <button onClick={() => setWeek((w) => addDays(w, -7))} className="btn-secondary px-3">←</button>
           <button onClick={() => setWeek(startOfWeek(new Date(), { weekStartsOn: 1 }))} className="btn-secondary px-3 text-xs">Today</button>
           <button onClick={() => setWeek((w) => addDays(w, 7))} className="btn-secondary px-3">→</button>
+          {canCreateZoom && (
+            <button onClick={() => setShowZoomSetup(true)}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium border border-purple-200 bg-purple-50 text-purple-700 hover:bg-purple-100 hover:border-purple-300 transition-colors">
+              🎥 Zoom Setup
+            </button>
+          )}
           {canCreateSchedule && <button onClick={() => setShowCreate(true)} className="btn-primary">+ Schedule</button>}
         </div>
       </div>
@@ -134,6 +135,14 @@ export default function Schedules() {
           classes={myClasses}
           onClose={() => setShowCreate(false)}
           onCreated={() => { setShowCreate(false); load(); }}
+          onBulkZoom={bulkZoom}
+        />
+      )}
+
+      {showZoomSetup && (
+        <ZoomSetupModal
+          classes={myClasses}
+          onClose={() => setShowZoomSetup(false)}
           onBulkZoom={bulkZoom}
         />
       )}
@@ -334,6 +343,116 @@ function CreateScheduleModal({ classes, onClose, onCreated, onBulkZoom }) {
           </button>
         </div>
       </form>
+    </Modal>
+  );
+}
+
+// ── Zoom Setup Modal — bulk-enable Zoom for all sessions of a class ───────────
+function ZoomSetupModal({ classes, onClose, onBulkZoom }) {
+  const [classId, setClassId] = useState('');
+  const [busy,    setBusy]    = useState(false);
+  const [result,  setResult]  = useState(null);  // { updated, failed } after run
+  const [error,   setError]   = useState('');
+
+  const run = async () => {
+    if (!classId) return;
+    setBusy(true); setError(''); setResult(null);
+    try {
+      const data = await onBulkZoom(classId);
+      setResult(data);
+    } catch (err) {
+      setError(err?.response?.data?.error || err?.message || 'Failed to set up Zoom. Check Zoom credentials.');
+    } finally { setBusy(false); }
+  };
+
+  const selectedClass = classes.find((c) => c.id === classId);
+
+  return (
+    <Modal open title="🎥 Zoom Setup" onClose={onClose} size="sm">
+      <div className="space-y-4">
+        <p className="text-sm text-gray-600 leading-relaxed">
+          Select a class to automatically create a Zoom meeting for every upcoming session
+          that doesn't already have one. Enrolled students will receive the join link via notification.
+        </p>
+
+        {/* Class picker */}
+        <div>
+          <label className="block text-xs font-medium text-gray-700 mb-1">Select Class *</label>
+          <select
+            className="input"
+            value={classId}
+            onChange={(e) => { setClassId(e.target.value); setResult(null); setError(''); }}
+            disabled={busy}
+          >
+            <option value="">Choose a class…</option>
+            {classes.map((c) => (
+              <option key={c.id} value={c.id}>{c.name}{c.level ? ` — ${c.level}` : ''}</option>
+            ))}
+          </select>
+        </div>
+
+        {/* Error */}
+        {error && (
+          <div className="p-3 bg-red-50 border border-red-100 rounded-xl text-sm text-red-700">{error}</div>
+        )}
+
+        {/* Result */}
+        {result && !error && (
+          <div className={`p-4 rounded-xl border ${result.updated > 0 ? 'bg-green-50 border-green-100' : 'bg-amber-50 border-amber-100'}`}>
+            {result.updated > 0 ? (
+              <>
+                <p className="text-sm font-semibold text-green-800 mb-1">
+                  ✅ Zoom enabled for {result.updated} session{result.updated !== 1 ? 's' : ''}
+                </p>
+                <p className="text-xs text-green-700">
+                  Students enrolled in <strong>{selectedClass?.name}</strong> have been notified with their Zoom join links.
+                </p>
+                {result.failed > 0 && (
+                  <p className="text-xs text-amber-600 mt-1">
+                    ⚠️ {result.failed} session{result.failed !== 1 ? 's' : ''} could not be set up — check your Zoom API credentials.
+                  </p>
+                )}
+              </>
+            ) : (
+              <p className="text-sm text-amber-700">
+                No upcoming sessions without Zoom found for this class.
+                All sessions may already have Zoom meetings set up.
+              </p>
+            )}
+          </div>
+        )}
+
+        {/* Actions */}
+        <div className="flex gap-2 pt-1">
+          <button onClick={onClose} className="btn-secondary flex-1">
+            {result ? 'Done' : 'Cancel'}
+          </button>
+          {!result && (
+            <button
+              onClick={run}
+              disabled={!classId || busy}
+              className="flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-sm font-semibold bg-purple-600 text-white hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            >
+              {busy ? (
+                <>
+                  <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  Setting up Zoom…
+                </>
+              ) : (
+                '🎥 Enable Zoom for all sessions'
+              )}
+            </button>
+          )}
+          {result && result.updated > 0 && (
+            <button
+              onClick={() => { setClassId(''); setResult(null); }}
+              className="flex-1 btn-secondary"
+            >
+              Set up another class
+            </button>
+          )}
+        </div>
+      </div>
     </Modal>
   );
 }
