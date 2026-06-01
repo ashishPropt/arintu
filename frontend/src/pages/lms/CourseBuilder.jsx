@@ -177,8 +177,9 @@ function LessonForm({ moduleId, classId, initial, onSave, onCancel }) {
       is_published: true,
     }
   )
-  const [saving, setSaving] = useState(false)
-  const [err, setErr] = useState('')
+  const [pickedFile, setPickedFile]   = useState(null)   // File object from <input type="file">
+  const [saving, setSaving]           = useState(false)
+  const [err, setErr]                 = useState('')
 
   const setF = (k, v) => setForm((f) => ({ ...f, [k]: v }))
 
@@ -187,22 +188,37 @@ function LessonForm({ moduleId, classId, initial, onSave, onCancel }) {
     setSaving(true)
     setErr('')
     try {
-      const payload = {
-        moduleId,
-        classId,
-        title: form.title,
-        content_type: form.content_type,
-        is_published: form.is_published,
-        ...(form.content_type === 'text' && { content_text: form.content_text }),
-        ...(form.content_type === 'video' && {
-          video_url: form.video_url,
-          duration_mins: form.duration_mins ? parseInt(form.duration_mins) : undefined,
-        }),
-        ...(form.content_type === 'file' && {
-          file_url: form.file_url,
-          file_name: form.file_name,
-        }),
+      let payload
+
+      if (form.content_type === 'file' && pickedFile) {
+        // Use FormData so the file travels as multipart
+        const fd = new FormData()
+        fd.append('moduleId', moduleId)
+        fd.append('classId', classId)
+        fd.append('title', form.title)
+        fd.append('content_type', 'file')
+        fd.append('is_published', form.is_published)
+        fd.append('lesson_file', pickedFile)
+        payload = fd
+      } else {
+        payload = {
+          moduleId,
+          classId,
+          title: form.title,
+          content_type: form.content_type,
+          is_published: form.is_published,
+          ...(form.content_type === 'text'  && { content_text: form.content_text }),
+          ...(form.content_type === 'video' && {
+            video_url: form.video_url,
+            duration_mins: form.duration_mins ? parseInt(form.duration_mins) : undefined,
+          }),
+          ...(form.content_type === 'file'  && {
+            file_url: form.file_url,
+            file_name: form.file_name,
+          }),
+        }
       }
+
       if (initial?.id) {
         await lms.updateLesson(initial.id, payload)
       } else {
@@ -216,6 +232,10 @@ function LessonForm({ moduleId, classId, initial, onSave, onCancel }) {
     }
   }
 
+  // Existing uploaded file (edit mode)
+  const existingFilePath = initial?.file_path
+  const existingFileName = initial?.file_name
+
   return (
     <div className="mt-2 p-3 rounded-xl border border-brand-100 bg-brand-50/20 space-y-3">
       <ErrorBanner msg={err} />
@@ -225,10 +245,10 @@ function LessonForm({ moduleId, classId, initial, onSave, onCancel }) {
       </div>
       <div>
         <label className="block text-xs font-medium text-gray-700 mb-1">Content Type</label>
-        <select className="input" value={form.content_type} onChange={(e) => setF('content_type', e.target.value)}>
-          <option value="text">Text</option>
-          <option value="video">Video</option>
-          <option value="file">File / Link</option>
+        <select className="input" value={form.content_type} onChange={(e) => { setF('content_type', e.target.value); setPickedFile(null) }}>
+          <option value="text">📝 Text</option>
+          <option value="video">🎬 Video (YouTube / Vimeo)</option>
+          <option value="file">📎 File upload</option>
         </select>
       </div>
 
@@ -243,7 +263,7 @@ function LessonForm({ moduleId, classId, initial, onSave, onCancel }) {
         <div className="space-y-2">
           <div>
             <label className="block text-xs font-medium text-gray-700 mb-1">Video URL</label>
-            <input className="input" value={form.video_url} onChange={(e) => setF('video_url', e.target.value)} placeholder="YouTube or Vimeo URL" />
+            <input className="input" value={form.video_url} onChange={(e) => setF('video_url', e.target.value)} placeholder="https://youtu.be/… or https://vimeo.com/…" />
           </div>
           <div>
             <label className="block text-xs font-medium text-gray-700 mb-1">Duration (minutes)</label>
@@ -254,14 +274,45 @@ function LessonForm({ moduleId, classId, initial, onSave, onCancel }) {
 
       {form.content_type === 'file' && (
         <div className="space-y-2">
+          {/* Show existing uploaded file when editing */}
+          {existingFilePath && !pickedFile && (
+            <div className="flex items-center gap-2 p-2 bg-white border border-gray-200 rounded-lg">
+              <span className="text-lg">📎</span>
+              <span className="text-xs text-gray-700 truncate flex-1">{existingFileName || 'Uploaded file'}</span>
+              <span className="text-xs text-gray-400">Replace below ↓</span>
+            </div>
+          )}
+
+          {/* File picker — uploads to server */}
           <div>
-            <label className="block text-xs font-medium text-gray-700 mb-1">File URL</label>
-            <input className="input" value={form.file_url} onChange={(e) => setF('file_url', e.target.value)} placeholder="https://…" />
+            <label className="block text-xs font-medium text-gray-700 mb-1">
+              {existingFilePath ? 'Replace file (optional)' : 'Upload file *'}
+            </label>
+            <input
+              type="file"
+              className="block w-full text-xs text-gray-600 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-medium file:bg-brand-50 file:text-brand-700 hover:file:bg-brand-100 cursor-pointer"
+              accept=".pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.jpg,.jpeg,.png,.gif,.webp,.mp4,.webm,.mp3,.wav,.zip,.txt"
+              onChange={(e) => {
+                const f = e.target.files?.[0] || null
+                setPickedFile(f)
+                if (f) setF('file_name', f.name)
+              }}
+            />
+            {pickedFile && (
+              <p className="mt-1 text-xs text-green-700">
+                ✓ {pickedFile.name} ({(pickedFile.size / 1024).toFixed(0)} KB)
+              </p>
+            )}
+            <p className="mt-1 text-xs text-gray-400">PDF, Word, PowerPoint, Excel, images, MP4, ZIP — max 50 MB</p>
           </div>
-          <div>
-            <label className="block text-xs font-medium text-gray-700 mb-1">File Name</label>
-            <input className="input" value={form.file_name} onChange={(e) => setF('file_name', e.target.value)} placeholder="worksheet.pdf" />
-          </div>
+
+          {/* OR paste external URL */}
+          {!pickedFile && !existingFilePath && (
+            <div>
+              <p className="text-xs text-gray-400 mb-1 text-center">— or paste an external link —</p>
+              <input className="input" value={form.file_url} onChange={(e) => setF('file_url', e.target.value)} placeholder="https://drive.google.com/…" />
+            </div>
+          )}
         </div>
       )}
 
