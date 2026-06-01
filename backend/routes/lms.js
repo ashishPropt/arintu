@@ -1,58 +1,7 @@
 const express = require('express');
-const router  = express.Router();
-const multer  = require('multer');
-const path    = require('path');
-const fs      = require('fs');
-const db      = require('../database/db');
+const router = express.Router();
+const db = require('../database/db');
 const { authenticate, authorize } = require('../middleware/auth');
-
-// ── Lesson file storage ────────────────────────────────────────────────────────
-const LESSON_UPLOAD_DIR = path.join(__dirname, '..', 'uploads', 'lessons');
-if (!fs.existsSync(LESSON_UPLOAD_DIR)) fs.mkdirSync(LESSON_UPLOAD_DIR, { recursive: true });
-
-const lessonStorage = multer.diskStorage({
-  destination: (_req, _file, cb) => cb(null, LESSON_UPLOAD_DIR),
-  filename: (_req, file, cb) => {
-    const ext  = path.extname(file.originalname).toLowerCase();
-    const base = path.basename(file.originalname, ext)
-      .replace(/[^a-z0-9]/gi, '_')
-      .slice(0, 50);
-    cb(null, `lesson_${Date.now()}_${base}${ext}`);
-  },
-});
-
-const lessonUpload = multer({
-  storage: lessonStorage,
-  limits: { fileSize: 50 * 1024 * 1024 }, // 50 MB
-  fileFilter: (_req, file, cb) => {
-    const allowed = [
-      'application/pdf',
-      'application/msword',
-      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-      'application/vnd.ms-powerpoint',
-      'application/vnd.openxmlformats-officedocument.presentationml.presentation',
-      'application/vnd.ms-excel',
-      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-      'image/jpeg', 'image/png', 'image/gif', 'image/webp',
-      'video/mp4', 'video/webm',
-      'audio/mpeg', 'audio/wav',
-      'application/zip',
-      'text/plain',
-    ];
-    if (allowed.includes(file.mimetype)) return cb(null, true);
-    cb(new Error('File type not allowed'));
-  },
-});
-
-function withLessonUpload(req, res, next) {
-  lessonUpload.single('lesson_file')(req, res, (err) => {
-    if (err instanceof multer.MulterError) {
-      return res.status(400).json({ error: err.code === 'LIMIT_FILE_SIZE' ? 'File must be under 50 MB' : err.message });
-    }
-    if (err) return res.status(400).json({ error: err.message });
-    next();
-  });
-}
 
 // ---------------------------------------------------------------------------
 // Helper: check if a user can manage a given class
@@ -244,49 +193,30 @@ router.delete('/modules/:id', authenticate, async (req, res) => {
   }
 });
 
-// POST /lms/lessons  (multipart/form-data when uploading a file)
-router.post('/lessons', authenticate, withLessonUpload, async (req, res) => {
+// POST /lms/lessons
+router.post('/lessons', authenticate, async (req, res) => {
   try {
-    const { moduleId, classId, title, content_type, content_text, video_url, file_url, file_name, duration_mins } = req.body;
+    const { moduleId, classId, title, content_type, content_text, video_url, duration_mins } = req.body;
     const { id: userId, role } = req.user;
 
     if (!(await canManageClass(userId, role, classId))) {
-      if (req.file) fs.unlinkSync(req.file.path);
       return res.status(403).json({ error: 'Forbidden' });
     }
 
-    // File upload takes priority over file_url for 'file' type lessons
-    const uploadedPath = req.file?.path || null;
-    const uploadedName = req.file?.originalname || null;
-    const uploadedSize = req.file?.size || null;
-
     const result = await db.query(
-      `INSERT INTO lessons
-         (module_id, class_id, title, content_type, content_text, video_url,
-          file_url, file_name, file_path, file_size, duration_mins)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING *`,
-      [
-        moduleId, classId, title,
-        content_type || 'text',
-        content_text || null,
-        video_url || null,
-        uploadedPath ? null : (file_url || null),
-        uploadedName || file_name || null,
-        uploadedPath,
-        uploadedSize,
-        duration_mins || null,
-      ]
+      `INSERT INTO lessons (module_id, class_id, title, content_type, content_text, video_url, duration_mins)
+       VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
+      [moduleId, classId, title, content_type || 'text', content_text || null, video_url || null, duration_mins || null]
     );
     return res.status(201).json(result.rows[0]);
   } catch (err) {
-    if (req.file) try { fs.unlinkSync(req.file.path); } catch {}
     console.error(err);
     return res.status(500).json({ error: 'Server error' });
   }
 });
 
-// PUT /lms/lessons/:id  (multipart/form-data when replacing a file)
-router.put('/lessons/:id', authenticate, withLessonUpload, async (req, res) => {
+// PUT /lms/lessons/:id
+router.put('/lessons/:id', authenticate, async (req, res) => {
   try {
     const { id } = req.params;
     const { title, content_type, content_text, video_url, file_url, file_name, duration_mins, position, is_published } = req.body;
@@ -297,100 +227,36 @@ router.put('/lessons/:id', authenticate, withLessonUpload, async (req, res) => {
 
     const lesson = lessonRes.rows[0];
     if (!(await canManageClass(userId, role, lesson.class_id))) {
-      if (req.file) fs.unlinkSync(req.file.path);
       return res.status(403).json({ error: 'Forbidden' });
-    }
-
-    // If a new file was uploaded, delete the old one
-    let newFilePath = lesson.file_path;
-    let newFileName = lesson.file_name;
-    let newFileSize = lesson.file_size;
-    let newFileUrl  = lesson.file_url;
-
-    if (req.file) {
-      if (lesson.file_path && fs.existsSync(lesson.file_path)) {
-        try { fs.unlinkSync(lesson.file_path); } catch {}
-      }
-      newFilePath = req.file.path;
-      newFileName = req.file.originalname;
-      newFileSize = req.file.size;
-      newFileUrl  = null; // uploaded file takes over from any external URL
-    } else if (file_url !== undefined) {
-      // Explicit external URL provided — clear any uploaded file
-      if (file_url && lesson.file_path && fs.existsSync(lesson.file_path)) {
-        try { fs.unlinkSync(lesson.file_path); } catch {}
-        newFilePath = null;
-        newFileSize = null;
-      }
-      newFileUrl  = file_url || null;
-      newFileName = file_name || lesson.file_name;
     }
 
     const result = await db.query(
       `UPDATE lessons
-       SET title        = COALESCE($1, title),
+       SET title = COALESCE($1, title),
            content_type = COALESCE($2, content_type),
            content_text = COALESCE($3, content_text),
-           video_url    = COALESCE($4, video_url),
-           file_url     = $5,
-           file_name    = $6,
-           file_path    = $7,
-           file_size    = $8,
-           duration_mins = COALESCE($9, duration_mins),
-           position     = COALESCE($10, position),
-           is_published = COALESCE($11, is_published),
-           updated_at   = NOW()
-       WHERE id = $12 RETURNING *`,
+           video_url = COALESCE($4, video_url),
+           file_url = COALESCE($5, file_url),
+           file_name = COALESCE($6, file_name),
+           duration_mins = COALESCE($7, duration_mins),
+           position = COALESCE($8, position),
+           is_published = COALESCE($9, is_published),
+           updated_at = NOW()
+       WHERE id = $10 RETURNING *`,
       [
-        title       ?? null,
+        title ?? null,
         content_type ?? null,
         content_text ?? null,
-        video_url   ?? null,
-        newFileUrl,
-        newFileName,
-        newFilePath,
-        newFileSize,
+        video_url ?? null,
+        file_url ?? null,
+        file_name ?? null,
         duration_mins ?? null,
-        position    ?? null,
-        is_published !== undefined ? (is_published === 'true' || is_published === true) : null,
+        position ?? null,
+        is_published ?? null,
         id,
       ]
     );
     return res.json(result.rows[0]);
-  } catch (err) {
-    if (req.file) try { fs.unlinkSync(req.file.path); } catch {}
-    console.error(err);
-    return res.status(500).json({ error: 'Server error' });
-  }
-});
-
-// GET /lms/lessons/:id/file  — authenticated download
-router.get('/lessons/:id/file', authenticate, async (req, res) => {
-  try {
-    const { id } = req.params;
-    const { id: userId, role } = req.user;
-
-    const lessonRes = await db.query('SELECT * FROM lessons WHERE id = $1', [id]);
-    if (lessonRes.rows.length === 0) return res.status(404).json({ error: 'Lesson not found' });
-
-    const lesson = lessonRes.rows[0];
-
-    // Students need to be enrolled; managers always allowed
-    const isManager = await canManageClass(userId, role, lesson.class_id);
-    if (!isManager) {
-      const enrolled = await db.query(
-        'SELECT id FROM enrollments WHERE class_id = $1 AND student_id = $2',
-        [lesson.class_id, userId]
-      );
-      if (enrolled.rows.length === 0) return res.status(403).json({ error: 'Access denied' });
-      if (!lesson.is_published) return res.status(403).json({ error: 'Lesson not available' });
-    }
-
-    if (!lesson.file_path || !fs.existsSync(lesson.file_path)) {
-      return res.status(404).json({ error: 'File not found on server' });
-    }
-
-    res.download(path.resolve(lesson.file_path), lesson.file_name || 'lesson-file');
   } catch (err) {
     console.error(err);
     return res.status(500).json({ error: 'Server error' });
@@ -409,11 +275,6 @@ router.delete('/lessons/:id', authenticate, async (req, res) => {
     const lesson = lessonRes.rows[0];
     if (!(await canManageClass(userId, role, lesson.class_id))) {
       return res.status(403).json({ error: 'Forbidden' });
-    }
-
-    // Delete uploaded file if any
-    if (lesson.file_path && fs.existsSync(lesson.file_path)) {
-      try { fs.unlinkSync(lesson.file_path); } catch {}
     }
 
     await db.query('DELETE FROM lessons WHERE id = $1', [id]);

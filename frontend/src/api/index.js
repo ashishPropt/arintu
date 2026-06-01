@@ -193,20 +193,9 @@ export const lms = {
   createModule: (data) => api.post('/lms/modules', data),
   updateModule: (id, data) => api.put(`/lms/modules/${id}`, data),
   deleteModule: (id) => api.delete(`/lms/modules/${id}`),
-  createLesson: (data) => {
-    if (data instanceof FormData) {
-      return api.post('/lms/lessons', data, { headers: { 'Content-Type': 'multipart/form-data' } });
-    }
-    return api.post('/lms/lessons', data);
-  },
-  updateLesson: (id, data) => {
-    if (data instanceof FormData) {
-      return api.put(`/lms/lessons/${id}`, data, { headers: { 'Content-Type': 'multipart/form-data' } });
-    }
-    return api.put(`/lms/lessons/${id}`, data);
-  },
+  createLesson: (data) => api.post('/lms/lessons', data),
+  updateLesson: (id, data) => api.put(`/lms/lessons/${id}`, data),
   deleteLesson: (id) => api.delete(`/lms/lessons/${id}`),
-  downloadLessonFile: (id) => api.get(`/lms/lessons/${id}/file`, { responseType: 'blob' }),
   // Progress
   markProgress: (lessonId, completed) => api.post('/lms/progress', { lessonId, completed }),
   myProgress: (classId) => api.get(`/lms/progress/${classId}`),

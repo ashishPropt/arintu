@@ -506,9 +506,7 @@ function LessonView({
   showRetake,
   onRetake,
 }) {
-  // Normalize field names: the DB returns video_url / file_url; ClassLearn uses content_url internally
-  const videoUrl  = lesson.video_url || lesson.content_url || null;
-  const embedUrl  = lesson.content_type === 'video' ? buildEmbedUrl(videoUrl) : null;
+  const embedUrl = lesson.content_type === 'video' ? buildEmbedUrl(lesson.content_url) : null;
 
   return (
     <div className="flex flex-col min-h-full">
@@ -531,16 +529,16 @@ function LessonView({
                   title={lesson.title}
                 />
               </div>
-            ) : videoUrl ? (
+            ) : lesson.content_url ? (
               <div className="p-4 bg-gray-50 border border-gray-100 rounded-xl">
                 <p className="text-sm text-gray-600 mb-2">Video URL:</p>
                 <a
-                  href={videoUrl}
+                  href={lesson.content_url}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="text-sm text-brand-600 hover:underline break-all"
                 >
-                  {videoUrl}
+                  {lesson.content_url}
                 </a>
               </div>
             ) : (
@@ -570,32 +568,17 @@ function LessonView({
                 <p className="text-sm font-medium text-gray-900 truncate">
                   {lesson.file_name || lesson.title || 'Download file'}
                 </p>
-                <p className="text-xs text-gray-500 mt-0.5">
-                  {lesson.file_size ? `${(lesson.file_size / 1024).toFixed(0)} KB · ` : ''}File attachment
-                </p>
+                <p className="text-xs text-gray-500 mt-0.5">File attachment</p>
               </div>
-              {/* Server-uploaded file — use authenticated download endpoint */}
-              {lesson.file_path && (
+              {lesson.content_url && (
                 <a
-                  href={`/api/lms/lessons/${lesson.id}/file`}
-                  className="shrink-0 text-sm font-medium text-brand-600 bg-brand-50 hover:bg-brand-100 px-3 py-1.5 rounded-lg transition-colors"
-                >
-                  Download →
-                </a>
-              )}
-              {/* External URL fallback */}
-              {!lesson.file_path && lesson.file_url && (
-                <a
-                  href={lesson.file_url}
+                  href={lesson.content_url}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="shrink-0 text-sm font-medium text-brand-600 bg-brand-50 hover:bg-brand-100 px-3 py-1.5 rounded-lg transition-colors"
                 >
-                  Open →
+                  Download →
                 </a>
-              )}
-              {!lesson.file_path && !lesson.file_url && (
-                <span className="shrink-0 text-xs text-gray-400">No file attached</span>
               )}
             </div>
           </div>
