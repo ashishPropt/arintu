@@ -121,7 +121,6 @@ export default function Classes() {
         <CreateClassModal
           onClose={() => setShowCreate(false)}
           onCreated={() => { setShowCreate(false); load(); }}
-          countries={regions}
         />
       )}
 
@@ -684,6 +683,18 @@ function AdminClassModal({ classId, onClose, onChanged, teachers, students, coun
           <Row label="Max Students" value={data.max_students} />
           <Row label="Enrolled"     value={data.enrolled_count} />
           <Row label="Admin"        value={data.admin_name} />
+          {(data.prerequisites || []).length > 0 && (
+            <div className="py-1 border-b border-gray-50">
+              <span className="text-gray-500 text-xs">Prerequisites</span>
+              <div className="flex flex-wrap gap-1 mt-1.5">
+                {data.prerequisites.map((p) => (
+                  <span key={p.id} className="inline-block px-2 py-0.5 rounded-lg bg-brand-50 text-brand-700 text-xs font-medium">
+                    {p.name}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
           {data.description && <p className="text-gray-600 text-xs mt-2">{data.description}</p>}
 
           {/* ── Danger zone ── */}
@@ -946,25 +957,44 @@ function AdminClassModal({ classId, onClose, onChanged, teachers, students, coun
   );
 }
 
+const LEVELS = ['Beginner', 'Intermediate', 'Advanced'];
+
 // ── Create class modal ────────────────────────────────────────────────────────
-function CreateClassModal({ onClose, onCreated, countries }) {
-  const [form, setForm]     = useState({ name: '', description: '', subject: '', level: '', maxStudents: 30 });
-  const [pricing, setPricing] = useState([{ countryId: null, price: '', isDefault: true }]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError]   = useState('');
+function CreateClassModal({ onClose, onCreated }) {
+  const [form, setForm] = useState({
+    name: '', description: '', subject: '', level: '', maxStudents: 30,
+  });
+  const [price,          setPrice]          = useState('');
+  const [prereqIds,      setPrereqIds]      = useState([]); // selected prerequisite class IDs
+  const [allClasses,     setAllClasses]     = useState([]); // for prerequisite picker
+  const [loading,        setLoading]        = useState(false);
+  const [error,          setError]          = useState('');
 
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
 
+  // Load all active classes for the prerequisite picker
+  useEffect(() => {
+    classesApi.list({ limit: 200 })
+      .then((r) => setAllClasses(r.data.classes || []))
+      .catch(() => {});
+  }, []);
+
+  const togglePrereq = (id) => {
+    setPrereqIds((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
+    );
+  };
+
   const submit = async (e) => {
     e.preventDefault();
+    if (!form.level) { setError('Please select a level.'); return; }
     setLoading(true);
+    setError('');
     try {
-      const res = await classesApi.create(form);
-      for (const p of pricing.filter((x) => x.price)) {
-        await classesApi.setPricing(res.data.id, {
-          countryId: p.countryId || undefined,
-          price: parseFloat(p.price),
-        });
+      const res = await classesApi.create({ ...form, prerequisiteClassIds: prereqIds });
+      const classId = res.data.id;
+      if (price && parseFloat(price) > 0) {
+        await classesApi.setPricing(classId, { price: parseFloat(price) });
       }
       onCreated();
     } catch (err) {
@@ -972,81 +1002,114 @@ function CreateClassModal({ onClose, onCreated, countries }) {
     } finally { setLoading(false); }
   };
 
+  // Classes available as prerequisites (exclude any already picked)
+  const availableClasses = allClasses.filter((c) => !prereqIds.includes(c.id));
+
   return (
     <Modal open title="Create Class" onClose={onClose} size="lg">
       <form onSubmit={submit} className="space-y-4">
         {error && <div className="p-3 bg-red-50 text-red-600 rounded-lg text-sm">{error}</div>}
+
         <div className="grid grid-cols-2 gap-3">
+          {/* Class name */}
           <div className="col-span-2">
             <label className="block text-xs font-medium text-gray-700 mb-1">Class Name *</label>
             <input className="input" value={form.name} onChange={(e) => set('name', e.target.value)} required />
           </div>
+
+          {/* Subject */}
           <div>
             <label className="block text-xs font-medium text-gray-700 mb-1">Subject</label>
             <input className="input" value={form.subject} onChange={(e) => set('subject', e.target.value)} />
           </div>
+
+          {/* Level dropdown */}
           <div>
-            <label className="block text-xs font-medium text-gray-700 mb-1">Level</label>
-            <input className="input" placeholder="e.g. Beginner" value={form.level} onChange={(e) => set('level', e.target.value)} />
+            <label className="block text-xs font-medium text-gray-700 mb-1">Level *</label>
+            <select
+              className="input"
+              value={form.level}
+              onChange={(e) => set('level', e.target.value)}
+              required
+            >
+              <option value="">Select level…</option>
+              {LEVELS.map((l) => <option key={l} value={l}>{l}</option>)}
+            </select>
           </div>
+
+          {/* Description */}
           <div className="col-span-2">
             <label className="block text-xs font-medium text-gray-700 mb-1">Description</label>
             <textarea className="input" rows={2} value={form.description} onChange={(e) => set('description', e.target.value)} />
           </div>
+
+          {/* Max students */}
           <div>
             <label className="block text-xs font-medium text-gray-700 mb-1">Max Students</label>
-            <input type="number" className="input" value={form.maxStudents} onChange={(e) => set('maxStudents', e.target.value)} />
+            <input type="number" className="input" min="1" value={form.maxStudents} onChange={(e) => set('maxStudents', e.target.value)} />
+          </div>
+
+          {/* Class price — single global price */}
+          <div>
+            <label className="block text-xs font-medium text-gray-700 mb-1">Class Price (USD)</label>
+            <input
+              type="number"
+              className="input"
+              min="0"
+              step="any"
+              placeholder="0 = free"
+              value={price}
+              onChange={(e) => setPrice(e.target.value)}
+            />
           </div>
         </div>
 
-        <div>
-          <div className="flex items-center justify-between mb-2">
-            <label className="text-xs font-medium text-gray-700">Pricing per Country</label>
-            <button
-              type="button"
-              onClick={() => setPricing((p) => [...p, { countryId: null, price: '', isDefault: false }])}
-              className="text-xs text-brand-600 hover:underline"
-            >
-              + Add country price
-            </button>
-          </div>
-          {pricing.map((p, i) => (
-            <div key={i} className="flex gap-2 mb-2 items-center">
-              <select
-                className="input text-sm flex-1"
-                value={p.countryId || ''}
-                onChange={(e) => setPricing((arr) => arr.map((x, j) => j === i ? { ...x, countryId: e.target.value || null } : x))}
-              >
-                <option value="">Default (all countries)</option>
-                {countries.map((c) => (
-                  <option key={c.id} value={c.id}>{c.name} ({c.currency_symbol} {c.currency_code})</option>
-                ))}
-              </select>
-              <div className="relative">
-                {p.countryId && (
-                  <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs text-gray-400 pointer-events-none">
-                    {countries.find((c) => c.id === p.countryId)?.currency_symbol}
-                  </span>
-                )}
-                <input
-                  type="number"
-                  className={`input w-28 ${p.countryId ? 'pl-6' : ''}`}
-                  placeholder="Price"
-                  value={p.price}
-                  onChange={(e) => setPricing((arr) => arr.map((x, j) => j === i ? { ...x, price: e.target.value } : x))}
-                />
+        {/* Prerequisites — shown after level selected, searchable multi-pick */}
+        {form.level && (
+          <div>
+            <label className="block text-xs font-medium text-gray-700 mb-1">
+              Prerequisites
+              <span className="text-gray-400 font-normal ml-1">— select classes students must have completed</span>
+            </label>
+
+            {/* Selected chips */}
+            {prereqIds.length > 0 && (
+              <div className="flex flex-wrap gap-1.5 mb-2">
+                {prereqIds.map((id) => {
+                  const cls = allClasses.find((c) => c.id === id);
+                  return (
+                    <span key={id} className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-brand-50 text-brand-700 text-xs font-medium">
+                      {cls?.name || id}
+                      <button type="button" onClick={() => togglePrereq(id)} className="hover:text-red-600 ml-0.5">✕</button>
+                    </span>
+                  );
+                })}
               </div>
-              {i > 0 && (
-                <button
-                  type="button"
-                  onClick={() => setPricing((arr) => arr.filter((_, j) => j !== i))}
-                  className="text-gray-400 hover:text-red-500 text-sm"
-                >✕</button>
-              )}
-            </div>
-          ))}
-          <p className="text-xs text-gray-400 mt-1">Prices are in the local currency of each country.</p>
-        </div>
+            )}
+
+            {/* Scrollable picker */}
+            {availableClasses.length > 0 ? (
+              <div className="border border-gray-200 rounded-xl overflow-hidden max-h-36 overflow-y-auto">
+                {availableClasses.map((c) => (
+                  <button
+                    key={c.id}
+                    type="button"
+                    onClick={() => togglePrereq(c.id)}
+                    className="w-full flex items-center gap-2 px-3 py-2 text-left text-sm hover:bg-brand-50 hover:text-brand-700 transition-colors border-b border-gray-50 last:border-0"
+                  >
+                    <span className="text-gray-300 text-xs">＋</span>
+                    <span className="flex-1">{c.name}</span>
+                    {c.level && <span className="text-xs text-gray-400">{c.level}</span>}
+                  </button>
+                ))}
+              </div>
+            ) : prereqIds.length === 0 ? (
+              <p className="text-xs text-gray-400 italic">No other classes available to set as prerequisites.</p>
+            ) : (
+              <p className="text-xs text-gray-400 italic">All available classes are already selected.</p>
+            )}
+          </div>
+        )}
 
         <div className="flex justify-end gap-2 pt-2">
           <button type="button" onClick={onClose} className="btn-secondary">Cancel</button>

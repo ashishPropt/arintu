@@ -69,30 +69,42 @@ router.post('/', authenticate, authorize('student'), async (req, res) => {
     const cls = await db.query('SELECT * FROM classes WHERE id = $1 AND is_active = TRUE', [classId]);
     if (!cls.rows[0]) return res.status(404).json({ error: 'Class not found or inactive' });
 
-    // ── 3b. Prerequisite check ────────────────────────────────────────────────
-    if (cls.rows[0].prerequisite_class_id) {
-      const prereqClassId = cls.rows[0].prerequisite_class_id;
-      // Check enrollment in prerequisite class
-      const prereqEnrolled = await db.query(
-        'SELECT id FROM enrollments WHERE class_id = $1 AND student_id = $2',
-        [prereqClassId, studentId]
+    // ── 3b. Prerequisite check (all prerequisites must be met) ───────────────
+    const prereqRows = await db.query(
+      `SELECT cp.prerequisite_class_id, c.name as prerequisite_class_name
+       FROM class_prerequisites cp
+       JOIN classes c ON c.id = cp.prerequisite_class_id
+       WHERE cp.class_id = $1`,
+      [classId]
+    );
+    if (prereqRows.rows.length > 0) {
+      const prereqIds = prereqRows.rows.map(r => r.prerequisite_class_id);
+
+      // Find which prerequisites the student is NOT enrolled in
+      const enrolledRes = await db.query(
+        `SELECT class_id FROM enrollments WHERE class_id = ANY($1::uuid[]) AND student_id = $2`,
+        [prereqIds, studentId]
       );
-      if (!prereqEnrolled.rows[0]) {
-        // Check manual admin override
+      const enrolledPrereqIds = new Set(enrolledRes.rows.map(r => r.class_id));
+
+      // Check admin overrides for any not enrolled
+      const notEnrolled = prereqRows.rows.filter(r => !enrolledPrereqIds.has(r.prerequisite_class_id));
+      const unmet = [];
+      for (const prereq of notEnrolled) {
         const override = await db.query(
-          `SELECT id FROM prerequisite_approvals
-           WHERE class_id = $1 AND student_id = $2 AND approved = TRUE`,
+          `SELECT id FROM prerequisite_approvals WHERE class_id = $1 AND student_id = $2 AND approved = TRUE`,
           [classId, studentId]
         );
-        if (!override.rows[0]) {
-          const prereqCls = await db.query('SELECT name FROM classes WHERE id = $1', [prereqClassId]);
-          return res.status(403).json({
-            error: `This class requires completion of "${prereqCls.rows[0]?.name || 'a prerequisite course'}". Please enrol and complete that course first, or contact your admin with documentation for a manual approval.`,
-            code: 'PREREQUISITE_REQUIRED',
-            prerequisiteClassId: prereqClassId,
-            prerequisiteClassName: prereqCls.rows[0]?.name,
-          });
-        }
+        if (!override.rows[0]) unmet.push(prereq);
+      }
+
+      if (unmet.length > 0) {
+        const names = unmet.map(p => `"${p.prerequisite_class_name}"`).join(', ');
+        return res.status(403).json({
+          error: `This class requires completion of the following prerequisite${unmet.length > 1 ? 's' : ''}: ${names}. Please enrol and complete ${unmet.length > 1 ? 'those courses' : 'that course'} first, or contact your admin for a manual approval.`,
+          code: 'PREREQUISITE_REQUIRED',
+          unmetPrerequisites: unmet.map(p => ({ id: p.prerequisite_class_id, name: p.prerequisite_class_name })),
+        });
       }
     }
 
