@@ -5,7 +5,6 @@ import PublicLayout from './components/PublicLayout';
 import Login from './pages/Login';
 import Landing from './pages/Landing';
 import Dashboard from './pages/Dashboard';
-import ClassLearn from './pages/ClassLearn';
 import Classes from './pages/Classes';
 import Schedules from './pages/Schedules';
 import Users from './pages/Users';
@@ -81,12 +80,6 @@ export default function App() {
             <Route path="/payment/success" element={<PaymentSuccess />} />
             <Route path="/payment/cancel"  element={<PaymentCancel />} />
           </Route>
-
-          {/* Full-screen learn page — outside Layout so it can take over the viewport */}
-          <Route
-            path="/app/learn/:classId"
-            element={<RequireAuth><ClassLearn /></RequireAuth>}
-          />
 
           {/* Authenticated app */}
           <Route path="/app" element={<RequireAuth><Layout /></RequireAuth>}>

@@ -2,7 +2,6 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import { classes as classesApi, schedules as schedulesApi, users, countries as countriesApi, applications, publicApi } from '../api';
 import { useAuth } from '../contexts/AuthContext';
 import Modal from '../components/Modal';
-import CourseBuilder from './lms/CourseBuilder';
 
 export default function Classes() {
   const { user } = useAuth();
@@ -101,7 +100,7 @@ export default function Classes() {
                   {c.price} {c.currency || 'USD'}
                 </p>
               )}
-              <div className="mt-3 space-y-1.5">
+              <div className="mt-3">
                 <button
                   onClick={() => setShowDetail(c.id)}
                   className={`text-xs py-1.5 px-3 w-full rounded-lg border font-medium transition-colors ${
@@ -112,14 +111,6 @@ export default function Classes() {
                 >
                   {isStudent ? (c.is_enrolled ? 'View My Class →' : 'View Details') : 'Manage'}
                 </button>
-                {isStudent && c.is_enrolled && (
-                  <a
-                    href={`/app/learn/${c.id}`}
-                    className="text-xs py-1.5 px-3 w-full rounded-lg border font-medium transition-colors bg-brand-600 text-white hover:bg-brand-700 border-brand-600 flex items-center justify-center gap-1"
-                  >
-                    🎓 Learn
-                  </a>
-                )}
               </div>
             </div>
           ))}
@@ -623,7 +614,6 @@ function ScholarshipRequestModal({ appId, className, onClose, onBack, onSubmitte
 
 // ── Admin / Teacher tabbed class modal ────────────────────────────────────────
 function AdminClassModal({ classId, onClose, onChanged, teachers, students, countries, isAdmin }) {
-  const { user } = useAuth();
   const [data, setData] = useState(null);
   const [enrollments, setEnrollments] = useState([]);
   const [tab, setTab] = useState('info');
@@ -667,26 +657,20 @@ function AdminClassModal({ classId, onClose, onChanged, teachers, students, coun
     onChanged();
   };
 
-  const tabs = [
-    { key: 'info',       label: 'Info' },
-    { key: 'teachers',   label: 'Teachers' },
-    { key: 'students',   label: 'Students' },
-    { key: 'pricing',    label: 'Pricing' },
-    { key: 'curriculum', label: '📚 Curriculum' },
-  ];
+  const tabs = ['info', 'teachers', 'students', 'pricing'];
 
   return (
     <Modal open title={data.name} onClose={onClose} size="lg">
-      <div className="flex gap-1 mb-4 border-b border-gray-100 pb-2 flex-wrap">
+      <div className="flex gap-1 mb-4 border-b border-gray-100 pb-2">
         {tabs.map((t) => (
           <button
-            key={t.key}
-            onClick={() => setTab(t.key)}
-            className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-              tab === t.key ? 'bg-brand-50 text-brand-700' : 'text-gray-500 hover:text-gray-700'
+            key={t}
+            onClick={() => setTab(t)}
+            className={`px-3 py-1.5 rounded-lg text-xs font-medium capitalize transition-colors ${
+              tab === t ? 'bg-brand-50 text-brand-700' : 'text-gray-500 hover:text-gray-700'
             }`}
           >
-            {t.label}
+            {t}
           </button>
         ))}
       </div>
@@ -870,10 +854,6 @@ function AdminClassModal({ classId, onClose, onChanged, teachers, students, coun
             ))}
           </div>
         </div>
-      )}
-
-      {tab === 'curriculum' && (
-        <CourseBuilder classId={data.id} userRole={user?.role} />
       )}
 
       {tab === 'pricing' && (
