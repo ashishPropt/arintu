@@ -46,6 +46,8 @@ export default function Schedules() {
   const canCreateZoom     = ['admin', 'superadmin', 'teacher'].includes(user?.role);
   const isAdmin           = ['admin', 'superadmin'].includes(user?.role);
 
+  const [upcoming, setUpcoming] = useState([]);
+
   const load = useCallback(async () => {
     setLoading(true);
     try {
@@ -57,16 +59,40 @@ export default function Schedules() {
     } catch {} finally { setLoading(false); }
   }, [week]);
 
-  // Jump the calendar to the week containing the next upcoming session
-  const jumpToNextSession = useCallback(async () => {
+  // Load upcoming sessions (for the list panel and for auto-jump)
+  const loadUpcoming = useCallback(async () => {
     try {
       const res = await schedulesApi.list({ from: new Date().toISOString() });
-      const upcoming = (res.data || []);
-      if (upcoming.length === 0) return;
-      const nextStart = new Date(upcoming[0].start_time);
-      setWeek(startOfWeek(nextStart, { weekStartsOn: 1 }));
-    } catch {}
+      setUpcoming(res.data || []);
+      return res.data || [];
+    } catch { return []; }
   }, []);
+
+  // Jump the calendar to the week containing the next upcoming session
+  const jumpToNextSession = useCallback(async () => {
+    const sessions = await loadUpcoming();
+    if (sessions.length === 0) return;
+    const nextStart = new Date(sessions[0].start_time);
+    setWeek(startOfWeek(nextStart, { weekStartsOn: 1 }));
+  }, [loadUpcoming]);
+
+  // On mount: load upcoming and auto-jump if current week is empty
+  useEffect(() => {
+    loadUpcoming().then((sessions) => {
+      if (sessions.length === 0) return;
+      // Check if any session falls in the current week; if not, jump to the first one
+      const weekEnd = new Date(addDays(week, 6).setHours(23, 59, 59, 999));
+      const hasThisWeek = sessions.some((s) => {
+        const t = new Date(s.start_time);
+        return t >= week && t <= weekEnd;
+      });
+      if (!hasThisWeek) {
+        const nextStart = new Date(sessions[0].start_time);
+        setWeek(startOfWeek(nextStart, { weekStartsOn: 1 }));
+      }
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // run once on mount
 
   useEffect(() => { load(); }, [load]);
 
@@ -142,6 +168,43 @@ export default function Schedules() {
           })}
         </div>
       </div>
+
+      {/* Upcoming sessions list */}
+      {upcoming.length > 0 && (
+        <div className="mt-6">
+          <h2 className="text-sm font-semibold text-gray-700 mb-3">Upcoming Sessions</h2>
+          <div className="space-y-2">
+            {upcoming.slice(0, 10).map((s) => (
+              <div key={s.id} className="card p-3 flex items-center gap-3">
+                <div className="text-center min-w-[3rem]">
+                  <p className="text-xs text-gray-400 uppercase">{format(new Date(s.start_time), 'EEE')}</p>
+                  <p className="text-lg font-bold text-brand-600 leading-none">{format(new Date(s.start_time), 'd')}</p>
+                  <p className="text-xs text-gray-400">{format(new Date(s.start_time), 'MMM')}</p>
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-semibold text-gray-900 truncate">{s.class_name}</p>
+                  {s.title && <p className="text-xs text-gray-500 truncate">{s.title}</p>}
+                  <p className="text-xs text-gray-400">
+                    {format(new Date(s.start_time), 'h:mm a')} – {format(new Date(s.end_time), 'h:mm a')}
+                  </p>
+                </div>
+                <button
+                  onClick={() => setWeek(startOfWeek(new Date(s.start_time), { weekStartsOn: 1 }))}
+                  className="text-xs text-brand-600 hover:underline shrink-0"
+                >
+                  View week →
+                </button>
+                {s.zoom_join_url && (
+                  <a href={s.zoom_join_url} target="_blank" rel="noreferrer"
+                    className="text-xs px-2 py-1 bg-purple-50 text-purple-700 rounded-lg font-medium shrink-0">
+                    Join Zoom
+                  </a>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {showCreate && (
         <CreateScheduleModal
