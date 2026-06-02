@@ -1,36 +1,35 @@
-import { useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useState, useEffect, useRef } from 'react';
+import { Link } from 'react-router-dom';
 import { auth as authApi, publicApi } from '../api';
-import { useAuth } from '../contexts/AuthContext';
 import Logo from '../components/Logo';
 
 const ROLES = [
-  { value: 'student', label: 'Student', desc: 'Browse and apply to classes', color: 'orange' },
-  { value: 'parent',  label: 'Parent',  desc: 'Monitor your child\'s progress', color: 'green' },
-  { value: 'teacher', label: 'Teacher', desc: 'Teach classes (pending approval)', color: 'blue' },
-  { value: 'admin',   label: 'Admin',   desc: 'Manage classes and students (pending approval)', color: 'purple' },
+  { value: 'student', label: 'Student',  desc: 'Browse and apply to classes',           color: 'orange' },
+  { value: 'parent',  label: 'Parent',   desc: 'Monitor your child\'s progress',        color: 'green'  },
+  { value: 'teacher', label: 'Teacher',  desc: 'Teach classes',                         color: 'blue'   },
+  { value: 'admin',   label: 'Admin',    desc: 'Manage classes and students',            color: 'purple' },
 ];
 
 const CONTACT_PREFS = [
-  { value: 'email',     label: 'Email' },
-  { value: 'phone',     label: 'Phone' },
-  { value: 'whatsapp',  label: 'WhatsApp' },
-  { value: 'any',       label: 'Any' },
+  { value: 'email',    label: 'Email'    },
+  { value: 'phone',    label: 'Phone'    },
+  { value: 'whatsapp', label: 'WhatsApp' },
+  { value: 'any',      label: 'Any'      },
 ];
 
 export default function Register() {
-  const { login } = useAuth();
-  const navigate = useNavigate();
   const [form, setForm] = useState({
     name: '', email: '', password: '', role: 'student',
     parentName: '', parentEmail: '', parentPhone: '',
     contactPreference: 'email',
     countryId: '',
   });
-  const [countries, setCountries] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
-  const [pending, setPending] = useState(false);
+  const [idFile,     setIdFile]     = useState(null);
+  const [countries,  setCountries]  = useState([]);
+  const [loading,    setLoading]    = useState(false);
+  const [error,      setError]      = useState('');
+  const [submitted,  setSubmitted]  = useState(false);
+  const fileRef = useRef(null);
 
   useEffect(() => {
     publicApi.countries().then((r) => setCountries(r.data || [])).catch(() => {});
@@ -42,21 +41,22 @@ export default function Register() {
     e.preventDefault();
     setError('');
 
-    // Frontend validation for parent fields
     if (form.role === 'student') {
       if (!form.parentName.trim()) return setError('Parent/guardian name is required');
       if (!form.parentEmail.trim()) return setError('Parent/guardian email is required');
     }
+    if (!idFile) return setError('Please upload a government-issued ID document to continue.');
 
     setLoading(true);
     try {
-      const res = await authApi.register(form);
+      // Use FormData so the ID file travels as multipart
+      const fd = new FormData();
+      Object.entries(form).forEach(([k, v]) => { if (v) fd.append(k, v); });
+      fd.append('id_document', idFile);
+
+      const res = await authApi.register(fd);
       if (res.data.pending) {
-        setPending(true);
-      } else {
-        localStorage.setItem('arintu_token', res.data.token);
-        await login(form.email, form.password);
-        navigate('/app/dashboard');
+        setSubmitted(true);
       }
     } catch (err) {
       setError(err.response?.data?.error || 'Failed to create account');
@@ -65,28 +65,31 @@ export default function Register() {
     }
   };
 
-  const selectedRole = ROLES.find((r) => r.value === form.role);
-  const needsApproval = form.role === 'teacher' || form.role === 'admin';
   const isStudent = form.role === 'student';
 
-  if (pending) {
+  // ── Submitted / pending screen ────────────────────────────────────────────
+  if (submitted) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-brand-50 via-white to-accent-50 p-4">
         <div className="w-full max-w-sm">
           <div className="card p-8 text-center">
-            <div className="text-5xl mb-4">⏳</div>
-            <h2 className="text-lg font-semibold text-gray-900 mb-2">Account created — pending approval</h2>
-            <p className="text-sm text-gray-500 mb-6">
-              Your <strong>{form.role}</strong> account has been created. The super admin will review
-              and approve your account. You will receive an email notification once approved.
+            <div className="text-5xl mb-4">🎉</div>
+            <h2 className="text-lg font-semibold text-gray-900 mb-2">Account created!</h2>
+            <p className="text-sm text-gray-500 mb-2">
+              Your ID is now being reviewed. We'll send you an email once your account is approved —
+              usually within 24 hours.
             </p>
-            <Link to="/login" className="btn-secondary">Back to sign in</Link>
+            <p className="text-sm text-gray-400 mb-6">
+              You can sign in to check your verification status at any time.
+            </p>
+            <Link to="/login" className="btn-primary w-full block text-center">Go to sign in</Link>
           </div>
         </div>
       </div>
     );
   }
 
+  // ── Registration form ─────────────────────────────────────────────────────
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-brand-50 via-white to-accent-50 p-4">
       <div className="w-full max-w-md">
@@ -108,6 +111,7 @@ export default function Register() {
           )}
 
           <form onSubmit={submit} className="space-y-4">
+
             {/* Role selection */}
             <div>
               <label className="block text-xs font-medium text-gray-700 mb-2">I am a…</label>
@@ -130,135 +134,117 @@ export default function Register() {
               </div>
             </div>
 
-            {needsApproval && (
-              <div className="p-3 bg-amber-50 border border-amber-100 rounded-lg text-xs text-amber-700">
-                ⚠️ <strong>{selectedRole?.label}</strong> accounts require super admin approval before you can sign in. You will be notified via email.
-              </div>
-            )}
-
-            {/* Student info */}
+            {/* Personal info */}
             <div>
               <label className="block text-xs font-medium text-gray-700 mb-1">Full Name</label>
-              <input
-                className="input"
-                placeholder="Your full name"
-                value={form.name}
-                onChange={(e) => set('name', e.target.value)}
-                required
-              />
+              <input className="input" placeholder="Your full name" value={form.name}
+                onChange={(e) => set('name', e.target.value)} required />
             </div>
 
             <div>
               <label className="block text-xs font-medium text-gray-700 mb-1">Email</label>
-              <input
-                type="email"
-                className="input"
-                placeholder="you@example.com"
-                value={form.email}
-                onChange={(e) => set('email', e.target.value)}
-                required
-              />
+              <input type="email" className="input" placeholder="you@example.com" value={form.email}
+                onChange={(e) => set('email', e.target.value)} required />
             </div>
 
             <div>
               <label className="block text-xs font-medium text-gray-700 mb-1">Password</label>
-              <input
-                type="password"
-                className="input"
-                placeholder="At least 6 characters"
-                value={form.password}
-                onChange={(e) => set('password', e.target.value)}
-                required
-                minLength={6}
-              />
+              <input type="password" className="input" placeholder="At least 6 characters" value={form.password}
+                onChange={(e) => set('password', e.target.value)} required minLength={6} />
             </div>
 
             {/* Contact preference */}
             <div>
               <label className="block text-xs font-medium text-gray-700 mb-1">Preferred contact method</label>
-              <select
-                className="input"
-                value={form.contactPreference}
-                onChange={(e) => set('contactPreference', e.target.value)}
-              >
-                {CONTACT_PREFS.map((p) => (
-                  <option key={p.value} value={p.value}>{p.label}</option>
-                ))}
+              <select className="input" value={form.contactPreference}
+                onChange={(e) => set('contactPreference', e.target.value)}>
+                {CONTACT_PREFS.map((p) => <option key={p.value} value={p.value}>{p.label}</option>)}
               </select>
             </div>
 
             {/* Country */}
             <div>
               <label className="block text-xs font-medium text-gray-700 mb-1">Country</label>
-              <select
-                className="input"
-                value={form.countryId}
-                onChange={(e) => set('countryId', e.target.value)}
-              >
+              <select className="input" value={form.countryId}
+                onChange={(e) => set('countryId', e.target.value)}>
                 <option value="">Select your country…</option>
-                {countries.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.name}
-                  </option>
-                ))}
+                {countries.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
               </select>
-              <p className="text-xs text-gray-400 mt-1">
-                Used to determine applicable fees. You can update this later from your profile.
-              </p>
+              <p className="text-xs text-gray-400 mt-1">Used to determine applicable fees.</p>
             </div>
 
-            {/* Parent/Guardian info — required for students */}
+            {/* Parent/Guardian info — students only */}
             {isStudent && (
               <div className="border border-blue-100 rounded-xl p-4 bg-blue-50 space-y-3">
                 <div>
                   <p className="text-xs font-semibold text-blue-800 mb-1">Parent / Guardian Information</p>
-                  <p className="text-xs text-blue-600">Required for student accounts. Your parent/guardian will receive updates about your progress.</p>
+                  <p className="text-xs text-blue-600">Required for student accounts.</p>
                 </div>
-
                 <div>
                   <label className="block text-xs font-medium text-gray-700 mb-1">
-                    Parent / Guardian Name <span className="text-red-500">*</span>
+                    Name <span className="text-red-500">*</span>
                   </label>
-                  <input
-                    className="input"
-                    placeholder="Parent or guardian full name"
-                    value={form.parentName}
-                    onChange={(e) => set('parentName', e.target.value)}
-                    required
-                  />
+                  <input className="input" placeholder="Parent or guardian full name"
+                    value={form.parentName} onChange={(e) => set('parentName', e.target.value)} />
                 </div>
-
                 <div>
                   <label className="block text-xs font-medium text-gray-700 mb-1">
-                    Parent / Guardian Email <span className="text-red-500">*</span>
+                    Email <span className="text-red-500">*</span>
                   </label>
-                  <input
-                    type="email"
-                    className="input"
-                    placeholder="parent@example.com"
-                    value={form.parentEmail}
-                    onChange={(e) => set('parentEmail', e.target.value)}
-                    required
-                  />
+                  <input type="email" className="input" placeholder="parent@example.com"
+                    value={form.parentEmail} onChange={(e) => set('parentEmail', e.target.value)} />
                 </div>
-
                 <div>
                   <label className="block text-xs font-medium text-gray-700 mb-1">
-                    Parent / Guardian Phone <span className="text-xs text-gray-400">(optional)</span>
+                    Phone <span className="text-xs text-gray-400">(optional)</span>
                   </label>
-                  <input
-                    type="tel"
-                    className="input"
-                    placeholder="+1 555 000 0000"
-                    value={form.parentPhone}
-                    onChange={(e) => set('parentPhone', e.target.value)}
-                  />
+                  <input type="tel" className="input" placeholder="+1 555 000 0000"
+                    value={form.parentPhone} onChange={(e) => set('parentPhone', e.target.value)} />
                 </div>
               </div>
             )}
 
+            {/* ID Document upload */}
+            <div className="border border-amber-100 rounded-xl p-4 bg-amber-50 space-y-2">
+              <div>
+                <p className="text-xs font-semibold text-amber-800 mb-0.5">
+                  🪪 Government-issued ID <span className="text-red-500">*</span>
+                </p>
+                <p className="text-xs text-amber-700 leading-snug">
+                  Upload a clear photo or scan of your passport, national ID, or driving licence.
+                  Your account will be activated once the document is verified (usually within 24 hours).
+                </p>
+              </div>
+
+              <input
+                ref={fileRef}
+                type="file"
+                accept=".jpg,.jpeg,.png,.pdf"
+                className="hidden"
+                onChange={(e) => setIdFile(e.target.files?.[0] || null)}
+              />
+
+              {idFile ? (
+                <div className="flex items-center gap-2 p-2 bg-white border border-amber-200 rounded-lg">
+                  <span className="text-base">📄</span>
+                  <span className="text-xs text-gray-700 flex-1 truncate">{idFile.name}</span>
+                  <span className="text-xs text-gray-400">{(idFile.size / 1024).toFixed(0)} KB</span>
+                  <button type="button" onClick={() => { setIdFile(null); fileRef.current.value = ''; }}
+                    className="text-xs text-red-400 hover:text-red-600 ml-1">✕</button>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => fileRef.current.click()}
+                  className="w-full py-2 px-3 border-2 border-dashed border-amber-200 rounded-lg text-xs text-amber-700 hover:bg-amber-100 transition-colors"
+                >
+                  Click to choose file — JPG, PNG, or PDF, max 5 MB
+                </button>
+              )}
+            </div>
+
             <button type="submit" disabled={loading} className="btn-primary w-full mt-1">
-              {loading ? 'Creating account…' : needsApproval ? `Request ${selectedRole?.label} Account` : 'Create Account'}
+              {loading ? 'Creating account…' : 'Create Account & Submit ID'}
             </button>
           </form>
 

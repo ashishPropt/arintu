@@ -1,15 +1,51 @@
 const express = require('express');
-const bcrypt = require('bcryptjs');
-const jwt = require('jsonwebtoken');
-const crypto = require('crypto');
+const bcrypt  = require('bcryptjs');
+const jwt     = require('jsonwebtoken');
+const crypto  = require('crypto');
+const multer  = require('multer');
+const path    = require('path');
+const fs      = require('fs');
 const { body, validationResult } = require('express-validator');
-const db = require('../database/db');
+const db      = require('../database/db');
 const { authenticate } = require('../middleware/auth');
-const email = require('../services/email');
+const email   = require('../services/email');
 const speakeasy = require('speakeasy');
-const QRCode = require('qrcode');
+const QRCode  = require('qrcode');
 
 const router = express.Router();
+
+// ── ID document upload at registration ────────────────────────────────────────
+const ID_UPLOAD_DIR = path.join(__dirname, '..', 'uploads', 'student-ids');
+if (!fs.existsSync(ID_UPLOAD_DIR)) fs.mkdirSync(ID_UPLOAD_DIR, { recursive: true });
+
+const regIdStorage = multer.diskStorage({
+  destination: (_req, _file, cb) => cb(null, ID_UPLOAD_DIR),
+  filename: (_req, file, cb) => {
+    const ext = path.extname(file.originalname).toLowerCase();
+    // No user ID yet — use timestamp + random; renamed in route once user is created
+    cb(null, `reg_${Date.now()}_${Math.random().toString(36).slice(2, 8)}${ext}`);
+  },
+});
+
+const regIdUpload = multer({
+  storage: regIdStorage,
+  limits: { fileSize: 5 * 1024 * 1024 }, // 5 MB
+  fileFilter: (_req, file, cb) => {
+    const allowed = ['image/jpeg', 'image/png', 'application/pdf'];
+    if (allowed.includes(file.mimetype)) return cb(null, true);
+    cb(new Error('Only JPG, PNG, or PDF files are allowed for your ID document'));
+  },
+});
+
+function withRegIdUpload(req, res, next) {
+  regIdUpload.single('id_document')(req, res, (err) => {
+    if (err instanceof multer.MulterError) {
+      return res.status(400).json({ error: err.code === 'LIMIT_FILE_SIZE' ? 'ID document must be under 5 MB' : err.message });
+    }
+    if (err) return res.status(400).json({ error: err.message });
+    next();
+  });
+}
 
 // ── POST /api/auth/login ───────────────────────────────────────────────────────
 router.post(
@@ -32,25 +68,27 @@ router.post(
 
       if (!user) return res.status(401).json({ error: 'Invalid credentials' });
 
-      // Specific messages for pending/rejected accounts before password check
-      if (user.account_status === 'pending') {
-        return res.status(403).json({
-          error: 'Your account is pending approval by the super admin. You will receive an email once approved.',
-          code: 'ACCOUNT_PENDING',
+      // Always validate password first to prevent user enumeration
+      const valid = await bcrypt.compare(password, user.password_hash);
+      if (!valid) return res.status(401).json({ error: 'Invalid credentials' });
+
+      // Pending accounts (waiting for ID verification) — issue a restricted token
+      // so the user can sign in and check their verification status / re-upload if rejected.
+      if (user.account_status === 'pending' || user.account_status === 'rejected') {
+        const token = jwt.sign({ userId: user.id }, process.env.JWT_SECRET, {
+          expiresIn: process.env.JWT_EXPIRES_IN || '7d',
+        });
+        return res.json({
+          token,
+          pendingVerification: true,
+          verificationStatus: user.verification_status,
+          user: { id: user.id, email: user.email, name: user.name, role: user.role, account_status: user.account_status },
         });
       }
-      if (user.account_status === 'rejected') {
-        return res.status(403).json({
-          error: 'Your account application was not approved. Please contact infoenfinitty@gmail.com for assistance.',
-          code: 'ACCOUNT_REJECTED',
-        });
-      }
+
       if (!user.is_active) {
         return res.status(401).json({ error: 'Invalid credentials' });
       }
-
-      const valid = await bcrypt.compare(password, user.password_hash);
-      if (!valid) return res.status(401).json({ error: 'Invalid credentials' });
 
       // If 2FA is enabled, issue a short-lived pending token instead of the full JWT
       if (user.totp_enabled) {
@@ -86,9 +124,10 @@ router.post(
 );
 
 // ── POST /api/auth/register ───────────────────────────────────────────────────
-// Public — supports: student (active), parent (active), teacher/admin (pending approval)
+// Public — all roles require ID document upload; accounts start as pending.
 router.post(
   '/register',
+  withRegIdUpload,
   [
     body('name').trim().notEmpty().withMessage('Name is required'),
     body('email').isEmail().normalizeEmail().withMessage('Valid email required'),
@@ -101,8 +140,17 @@ router.post(
       .withMessage('A valid parent/guardian email is required for student accounts'),
   ],
   async (req, res) => {
+    // ID document is mandatory for all registrations
+    if (!req.file) {
+      return res.status(400).json({ error: 'A government-issued ID document (JPG, PNG, or PDF) is required to register.' });
+    }
+
     const errors = validationResult(req);
-    if (!errors.isEmpty()) return res.status(400).json({ error: errors.array()[0].msg });
+    if (!errors.isEmpty()) {
+      // Clean up uploaded file on validation failure
+      try { fs.unlinkSync(req.file.path); } catch {}
+      return res.status(400).json({ error: errors.array()[0].msg });
+    }
 
     const {
       name, email: emailAddr, password, role: requestedRole = 'student', parentId,
@@ -111,25 +159,24 @@ router.post(
     } = req.body;
     const role = requestedRole;
 
-    // superadmin cannot self-register
     if (role === 'superadmin') {
+      try { fs.unlinkSync(req.file.path); } catch {}
       return res.status(400).json({ error: 'Invalid role' });
     }
 
     try {
       const existing = await db.query('SELECT id FROM users WHERE email = $1', [emailAddr]);
       if (existing.rows.length > 0) {
+        try { fs.unlinkSync(req.file.path); } catch {}
         return res.status(409).json({ error: 'An account with this email already exists' });
       }
 
       const hash = await bcrypt.hash(password, 12);
 
-      // admin and teacher go into pending state — superadmin must approve
-      const needsApproval = role === 'admin' || role === 'teacher';
-      const isActive = !needsApproval;
-      const accountStatus = needsApproval ? 'pending' : 'active';
+      // All roles start pending — account is activated only after ID is verified
+      const accountStatus = 'pending';
+      const isActive = false;
 
-      // Validate parentId if provided (for student linking to parent account)
       let validatedParentId = null;
       if (parentId) {
         const parent = await db.query(
@@ -141,32 +188,34 @@ router.post(
 
       const result = await db.query(
         `INSERT INTO users (name, email, password_hash, role, is_active, account_status, parent_id,
-                            parent_name, parent_email, parent_phone, contact_preference, country_id)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+                            parent_name, parent_email, parent_phone, contact_preference, country_id,
+                            id_document_path, id_document_uploaded_at, verification_status)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, NOW(), 'pending')
          RETURNING id, email, name, role, account_status`,
         [name, emailAddr, hash, role, isActive, accountStatus, validatedParentId,
          role === 'student' ? (parentName || null) : null,
          role === 'student' ? (parentEmail || null) : null,
          role === 'student' ? (parentPhone || null) : null,
          contactPreference || 'email',
-         countryId || null]
+         countryId || null,
+         req.file.path]
       );
       const user = result.rows[0];
 
-      if (needsApproval) {
-        // Don't issue a token — account needs superadmin approval first
-        return res.status(201).json({
-          pending: true,
-          message: `Your ${role} account has been created and is pending approval by the super admin. You will receive an email once approved.`,
-        });
-      }
+      // Rename the file to include the real user ID for traceability
+      const ext     = path.extname(req.file.path).toLowerCase();
+      const newPath = path.join(ID_UPLOAD_DIR, `${user.id}_${Date.now()}${ext}`);
+      try {
+        fs.renameSync(req.file.path, newPath);
+        await db.query('UPDATE users SET id_document_path = $1 WHERE id = $2', [newPath, user.id]);
+      } catch { /* non-fatal — old temp path still works */ }
 
-      const token = jwt.sign({ userId: user.id }, process.env.JWT_SECRET, {
-        expiresIn: process.env.JWT_EXPIRES_IN || '7d',
+      return res.status(201).json({
+        pending: true,
+        message: 'Your account has been created. Your ID is being reviewed — you will be notified by email once approved.',
       });
-
-      res.status(201).json({ token, user });
     } catch (err) {
+      try { fs.unlinkSync(req.file.path); } catch {}
       console.error(err);
       res.status(500).json({ error: 'Server error' });
     }

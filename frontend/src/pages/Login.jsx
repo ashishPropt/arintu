@@ -28,7 +28,12 @@ export default function Login() {
     setLoading(true);
     try {
       const res = await authApi.login({ email, password });
-      if (res.data.require2fa) {
+      if (res.data.pendingVerification) {
+        // Account exists but is awaiting ID verification — store token so /me works
+        localStorage.setItem('arintu_token', res.data.token);
+        await reload();
+        navigate('/pending-verification', { replace: true });
+      } else if (res.data.require2fa) {
         // Need TOTP code — show second step
         setPendingToken(res.data.pendingToken);
       } else {

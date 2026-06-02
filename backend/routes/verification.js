@@ -44,11 +44,10 @@ const upload = multer({
   },
 });
 
-// ── POST /api/verification/upload-id  (student) ───────────────────────────────
+// ── POST /api/verification/upload-id  (any authenticated user — re-upload after rejection) ──
 router.post(
   '/upload-id',
   authenticate,
-  authorize('student'),
   (req, res, next) => {
     upload.single('id_document')(req, res, (err) => {
       if (err instanceof multer.MulterError) {
@@ -96,8 +95,8 @@ router.post(
   }
 );
 
-// ── GET /api/verification/status  (student — own status) ─────────────────────
-router.get('/status', authenticate, authorize('student'), async (req, res) => {
+// ── GET /api/verification/status  (any authenticated user — own status) ───────
+router.get('/status', authenticate, async (req, res) => {
   const result = await db.query(
     `SELECT verification_status, id_document_uploaded_at, verification_notes
      FROM users WHERE id = $1`,
@@ -106,10 +105,11 @@ router.get('/status', authenticate, authorize('student'), async (req, res) => {
   res.json(result.rows[0] || {});
 });
 
-// ── GET /api/verification  (admin/superadmin — list) ─────────────────────────
+// ── GET /api/verification  (admin/superadmin — list all pending IDs) ─────────
 router.get('/', authenticate, authorize('admin', 'superadmin'), async (req, res) => {
   const { status } = req.query;
-  let where = ["u.role = 'student'", 'u.id_document_path IS NOT NULL'];
+  // Show all non-superadmin users who have uploaded an ID document
+  let where = ["u.role NOT IN ('admin', 'superadmin')", 'u.id_document_path IS NOT NULL'];
   let params = [];
   let idx = 1;
 
@@ -120,7 +120,7 @@ router.get('/', authenticate, authorize('admin', 'superadmin'), async (req, res)
 
   try {
     const result = await db.query(
-      `SELECT u.id, u.name, u.email, u.verification_status,
+      `SELECT u.id, u.name, u.email, u.role, u.account_status, u.verification_status,
               u.id_document_uploaded_at, u.verification_notes,
               r.name as reviewer_name
        FROM users u
@@ -165,31 +165,31 @@ router.put('/:userId/approve', authenticate, authorize('admin', 'superadmin'), a
   try {
     const result = await db.query(
       `UPDATE users SET
-         verification_status     = 'approved',
-         verification_notes      = NULL,
+         verification_status      = 'approved',
+         verification_notes       = NULL,
          verification_reviewed_by = $1,
          verification_reviewed_at = NOW(),
-         updated_at = NOW()
-       WHERE id = $2 AND role = 'student'
-       RETURNING id, name, email, verification_status`,
+         account_status           = 'active',
+         is_active                = TRUE,
+         updated_at               = NOW()
+       WHERE id = $2 AND role NOT IN ('admin', 'superadmin')
+       RETURNING id, name, email, role, verification_status, account_status`,
       [req.user.id, req.params.userId]
     );
-    if (!result.rows[0]) return res.status(404).json({ error: 'Student not found' });
+    if (!result.rows[0]) return res.status(404).json({ error: 'User not found' });
 
-    const student = result.rows[0];
+    const usr = result.rows[0];
 
-    // Notify student in-app
     await createNotification({
-      userId: student.id,
-      title: 'ID Verification approved',
-      message: 'Your identity document has been verified. You can now apply to classes.',
+      userId: usr.id,
+      title: 'ID Verification approved — account active',
+      message: 'Your identity has been verified and your account is now active. Welcome to Arintu!',
       type: 'info',
     });
 
-    // Send email
-    emailSvc.sendVerificationApproved(student.email, student.name).catch(() => {});
+    emailSvc.sendVerificationApproved(usr.email, usr.name).catch(() => {});
 
-    res.json(student);
+    res.json(usr);
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Server error' });
@@ -207,24 +207,24 @@ router.put('/:userId/reject', authenticate, authorize('admin', 'superadmin'), as
          verification_reviewed_by = $2,
          verification_reviewed_at = NOW(),
          updated_at = NOW()
-       WHERE id = $3 AND role = 'student'
-       RETURNING id, name, email, verification_status`,
+       WHERE id = $3 AND role NOT IN ('admin', 'superadmin')
+       RETURNING id, name, email, role, verification_status`,
       [notes || null, req.user.id, req.params.userId]
     );
-    if (!result.rows[0]) return res.status(404).json({ error: 'Student not found' });
+    if (!result.rows[0]) return res.status(404).json({ error: 'User not found' });
 
-    const student = result.rows[0];
+    const usr = result.rows[0];
 
     await createNotification({
-      userId: student.id,
+      userId: usr.id,
       title: 'ID Verification not approved',
-      message: `Your ID document was not approved.${notes ? ' Reason: ' + notes : ''} Please re-upload a clear, valid government-issued ID.`,
+      message: `Your ID document was not approved.${notes ? ' Reason: ' + notes : ''} Please sign in and re-upload a clear, valid government-issued ID.`,
       type: 'info',
     });
 
-    emailSvc.sendVerificationRejected(student.email, student.name, notes).catch(() => {});
+    emailSvc.sendVerificationRejected(usr.email, usr.name, notes).catch(() => {});
 
-    res.json(student);
+    res.json(usr);
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Server error' });

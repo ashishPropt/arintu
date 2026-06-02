@@ -20,6 +20,7 @@ import StudentVerification from './pages/admin/StudentVerification';
 import ForgotPassword from './pages/ForgotPassword';
 import ResetPassword from './pages/ResetPassword';
 import Register from './pages/Register';
+import PendingVerification from './pages/PendingVerification';
 import TwoFactorSetup from './pages/TwoFactorSetup';
 
 // Public content pages
@@ -46,6 +47,10 @@ function RequireAuth({ children, roles }) {
     </div>
   );
   if (!user) return <Navigate to="/login" replace />;
+  // Accounts awaiting ID verification cannot access the main app
+  if (user.account_status === 'pending' || user.account_status === 'rejected') {
+    return <Navigate to="/pending-verification" replace />;
+  }
   if (roles && !roles.includes(user.role)) return <Navigate to="/app/dashboard" replace />;
   return children;
 }
@@ -58,6 +63,7 @@ export default function App() {
           {/* Auth */}
           <Route path="/login" element={<LoginRedirect />} />
           <Route path="/register" element={<Register />} />
+          <Route path="/pending-verification" element={<PendingVerification />} />
           <Route path="/forgot-password" element={<ForgotPassword />} />
           <Route path="/reset-password" element={<ResetPassword />} />
 
@@ -146,7 +152,12 @@ export default function App() {
 function LoginRedirect() {
   const { user, loading } = useAuth();
   if (loading) return null;
-  if (user) return <Navigate to="/app/dashboard" replace />;
+  if (user) {
+    if (user.account_status === 'pending' || user.account_status === 'rejected') {
+      return <Navigate to="/pending-verification" replace />;
+    }
+    return <Navigate to="/app/dashboard" replace />;
+  }
   return <Login />;
 }
 

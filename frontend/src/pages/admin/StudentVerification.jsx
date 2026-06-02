@@ -67,8 +67,8 @@ export default function StudentVerification() {
     <div>
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-xl font-bold text-gray-900">Student ID Verification</h1>
-          <p className="text-sm text-gray-500">Review and verify student identity documents</p>
+          <h1 className="text-xl font-bold text-gray-900">ID Verification</h1>
+          <p className="text-sm text-gray-500">Review and verify identity documents for all new accounts</p>
         </div>
       </div>
 
@@ -108,6 +108,9 @@ export default function StudentVerification() {
                     <p className="font-semibold text-gray-900 text-sm">{s.name}</p>
                     <span className={`text-xs px-2 py-0.5 rounded-full border ${STATUS_COLORS[s.verification_status] || 'bg-gray-50 text-gray-500 border-gray-100'}`}>
                       {s.verification_status || 'no upload'}
+                    </span>
+                    <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-600 border border-gray-200 capitalize">
+                      {s.role}
                     </span>
                   </div>
                   <p className="text-xs text-gray-500">{s.email}</p>
@@ -158,7 +161,7 @@ export default function StudentVerification() {
         <Modal open title="Reject ID Verification" onClose={() => setRejectTarget(null)} size="sm">
           <div className="space-y-4">
             <p className="text-sm text-gray-600">
-              Rejecting ID verification for <strong>{rejectTarget.name}</strong>. The student will be notified and can re-upload.
+              Rejecting ID verification for <strong>{rejectTarget.name}</strong>. They will be notified by email and can re-upload a new document.
             </p>
             <div>
               <label className="block text-xs font-medium text-gray-700 mb-1">
