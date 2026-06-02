@@ -21,6 +21,8 @@ import ForgotPassword from './pages/ForgotPassword';
 import ResetPassword from './pages/ResetPassword';
 import Register from './pages/Register';
 import PendingVerification from './pages/PendingVerification';
+import ForcePasswordChange from './pages/ForcePasswordChange';
+import Family from './pages/Family';
 import TwoFactorSetup from './pages/TwoFactorSetup';
 
 // Public content pages
@@ -51,6 +53,10 @@ function RequireAuth({ children, roles }) {
   if (user.account_status === 'pending' || user.account_status === 'rejected') {
     return <Navigate to="/pending-verification" replace />;
   }
+  // Accounts created by family members must set their own password first
+  if (user.must_change_password) {
+    return <Navigate to="/change-password" replace />;
+  }
   if (roles && !roles.includes(user.role)) return <Navigate to="/app/dashboard" replace />;
   return children;
 }
@@ -64,6 +70,7 @@ export default function App() {
           <Route path="/login" element={<LoginRedirect />} />
           <Route path="/register" element={<Register />} />
           <Route path="/pending-verification" element={<PendingVerification />} />
+          <Route path="/change-password" element={<ForcePasswordChange />} />
           <Route path="/forgot-password" element={<ForgotPassword />} />
           <Route path="/reset-password" element={<ResetPassword />} />
 
@@ -139,6 +146,11 @@ export default function App() {
                 <ManageTeam />
               </RequireAuth>
             } />
+            <Route path="family" element={
+              <RequireAuth roles={['student', 'parent']}>
+                <Family />
+              </RequireAuth>
+            } />
             <Route path="security" element={<TwoFactorSetup />} />
           </Route>
 
@@ -155,6 +167,9 @@ function LoginRedirect() {
   if (user) {
     if (user.account_status === 'pending' || user.account_status === 'rejected') {
       return <Navigate to="/pending-verification" replace />;
+    }
+    if (user.must_change_password) {
+      return <Navigate to="/change-password" replace />;
     }
     return <Navigate to="/app/dashboard" replace />;
   }

@@ -36,6 +36,7 @@ app.use('/api/payments',      require('./routes/payments'));
 app.use('/api/public',        require('./routes/public'));
 app.use('/api/verification',  require('./routes/verification'));
 app.use('/api/worksheets',    require('./routes/worksheets'));
+app.use('/api/family',        require('./routes/family'));
 
 app.get('/api/health', (req, res) => res.json({ status: 'ok', version: '1.0.0' }));
 

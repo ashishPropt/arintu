@@ -36,6 +36,7 @@ export const auth = {
   twoFaDisable: (password, code) => api.post('/auth/2fa/disable', { password, code }),
   twoFaVerify: (pendingToken, code) => api.post('/auth/2fa/verify', { pendingToken, code }),
   updateProfile: (data) => api.put('/auth/profile', data),
+  setFirstPassword: (newPassword) => api.post('/auth/set-first-password', { newPassword }),
 };
 
 export const users = {
@@ -179,6 +180,14 @@ export const pricing = {
   create: (data) => api.post('/pricing', data),
   update: (id, data) => api.put(`/pricing/${id}`, data),
   remove: (id) => api.delete(`/pricing/${id}`),
+};
+
+export const family = {
+  children:          ()      => api.get('/family/children'),
+  parent:            ()      => api.get('/family/parent'),
+  childApplications: (id)    => api.get(`/family/children/${id}/applications`),
+  addChild:          (data)  => api.post('/family/add-child', data),
+  addParent:         (data)  => api.post('/family/add-parent', data),
 };
 
 export const mathwave = {

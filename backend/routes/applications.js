@@ -303,7 +303,11 @@ router.post('/', authenticate, authorize('student'), async (req, res) => {
 });
 
 // ── POST /api/applications/:id/retry-app-fee ── recreate Stripe session for app fee
-router.post('/:id/retry-app-fee', authenticate, authorize('student'), async (req, res) => {
+// Accessible by the student OR their linked parent
+router.post('/:id/retry-app-fee', authenticate, async (req, res) => {
+  if (!['student', 'parent'].includes(req.user.role)) {
+    return res.status(403).json({ error: 'Forbidden' });
+  }
   try {
     const app = await db.query(
       `SELECT ca.*, cl.name as class_name,
@@ -313,7 +317,8 @@ router.post('/:id/retry-app-fee', authenticate, authorize('student'), async (req
        JOIN classes cl ON cl.id = ca.class_id
        LEFT JOIN countries co ON co.id = ca.country_id
        LEFT JOIN application_fees af ON af.country_id = ca.country_id
-       WHERE ca.id = $1 AND ca.student_id = $2`,
+       JOIN users u ON u.id = ca.student_id
+       WHERE ca.id = $1 AND (ca.student_id = $2 OR u.parent_id = $2)`,
       [req.params.id, req.user.id]
     );
     if (!app.rows[0]) return res.status(404).json({ error: 'Application not found' });
@@ -414,13 +419,19 @@ router.put('/:id/request-scholarship', authenticate, authorize('student'), async
 });
 
 // ── POST /api/applications/:id/pay-class-fee ── create Stripe session for class fee
-router.post('/:id/pay-class-fee', authenticate, authorize('student'), async (req, res) => {
+// Accessible by the student OR their linked parent
+router.post('/:id/pay-class-fee', authenticate, async (req, res) => {
+  if (!['student', 'parent'].includes(req.user.role)) {
+    return res.status(403).json({ error: 'Forbidden' });
+  }
   try {
+    // Parent can pay if the application student is their child (parent_id = caller)
     const app = await db.query(
       `SELECT ca.*, cl.name as class_name, cl.id as class_id_val
        FROM class_applications ca
        JOIN classes cl ON cl.id = ca.class_id
-       WHERE ca.id = $1 AND ca.student_id = $2`,
+       JOIN users  u  ON u.id  = ca.student_id
+       WHERE ca.id = $1 AND (ca.student_id = $2 OR u.parent_id = $2)`,
       [req.params.id, req.user.id]
     );
     if (!app.rows[0]) return res.status(404).json({ error: 'Application not found' });

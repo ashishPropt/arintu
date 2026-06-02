@@ -60,7 +60,7 @@ router.post(
       const result = await db.query(
         `SELECT id, email, password_hash, name, role, region_id, is_active,
                 account_status, verification_status, fee_waiver_status,
-                totp_enabled
+                totp_enabled, must_change_password
          FROM users WHERE email = $1`,
         [emailAddr]
       );
@@ -88,6 +88,18 @@ router.post(
 
       if (!user.is_active) {
         return res.status(401).json({ error: 'Invalid credentials' });
+      }
+
+      // Account created by a family member — must set own password before accessing the app
+      if (user.must_change_password) {
+        const token = jwt.sign({ userId: user.id }, process.env.JWT_SECRET, {
+          expiresIn: process.env.JWT_EXPIRES_IN || '7d',
+        });
+        return res.json({
+          token,
+          mustChangePassword: true,
+          user: { id: user.id, email: user.email, name: user.name, role: user.role },
+        });
       }
 
       // If 2FA is enabled, issue a short-lived pending token instead of the full JWT
@@ -227,6 +239,7 @@ router.get('/me', authenticate, async (req, res) => {
   const result = await db.query(
     `SELECT u.id, u.email, u.name, u.role, u.phone, u.avatar_url, u.region_id,
             u.fee_waiver_status, u.verification_status, u.account_status,
+            u.must_change_password,
             u.id_document_uploaded_at, u.verification_notes,
             u.country_id,
             co.code  AS country_code,
@@ -242,6 +255,33 @@ router.get('/me', authenticate, async (req, res) => {
   );
   res.json(result.rows[0]);
 });
+
+// ── POST /api/auth/set-first-password  (family-created accounts — no old password needed) ──
+router.post(
+  '/set-first-password',
+  authenticate,
+  [body('newPassword').isLength({ min: 6 }).withMessage('Password must be at least 6 characters')],
+  async (req, res) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) return res.status(400).json({ error: errors.array()[0].msg });
+
+    try {
+      const userRow = await db.query('SELECT must_change_password FROM users WHERE id = $1', [req.user.id]);
+      if (!userRow.rows[0]?.must_change_password) {
+        return res.status(400).json({ error: 'No password change required for this account' });
+      }
+      const hash = await bcrypt.hash(req.body.newPassword, 12);
+      await db.query(
+        'UPDATE users SET password_hash = $1, must_change_password = FALSE, updated_at = NOW() WHERE id = $2',
+        [hash, req.user.id]
+      );
+      res.json({ message: 'Password updated successfully' });
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({ error: 'Server error' });
+    }
+  }
+);
 
 // ── PUT /api/auth/profile ─────────────────────────────────────────────────────
 // Lets any authenticated user update their own profile fields (country for now)

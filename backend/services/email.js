@@ -275,6 +275,67 @@ async function send2FACode(email, name, code) {
   });
 }
 
+// ── Family linking ─────────────────────────────────────────────────────────────
+
+/**
+ * Sent when a family member creates a new account on someone's behalf.
+ * addedAs: 'child'  → email goes to the new child (created by parent)
+ * addedAs: 'parent' → email goes to the new parent (created by student/child)
+ */
+async function sendFamilyWelcome({ toEmail, toName, byName, addedAs, tempPassword }) {
+  const isChild = addedAs === 'child';
+  const relation = isChild ? 'parent' : 'child';
+  const subject = isChild
+    ? `Your parent ${byName} has created an Arintu account for you`
+    : `Your child ${byName} has added you to Arintu`;
+
+  await sendMail({
+    to: toEmail,
+    subject,
+    html: wrap(`
+      <h2 style="color:#1e293b;margin:0 0 8px">Welcome to Arintu! 👋</h2>
+      <p>Hi ${toName},</p>
+      <p>Your ${relation} <strong>${byName}</strong> has created an account for you on <strong>Arintu Learning Platform</strong>.</p>
+      <p>Here are your sign-in credentials:</p>
+      <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:16px 20px;margin:16px 0">
+        <p style="margin:0 0 8px"><strong>Email:</strong> ${toEmail}</p>
+        <p style="margin:0"><strong>Temporary password:</strong> <code style="background:#e2e8f0;padding:2px 6px;border-radius:4px;font-size:15px">${tempPassword}</code></p>
+      </div>
+      <p style="color:#6b7280;font-size:13px">After signing in you will need to:</p>
+      <ol style="color:#6b7280;font-size:13px;margin:8px 0">
+        <li>Upload a government-issued ID for verification</li>
+        <li>Set a new permanent password</li>
+      </ol>
+      ${btn(FRONTEND_URL() + '/login', 'Sign In to Arintu')}
+      <p style="color:#9ca3af;font-size:12px">If you did not expect this email, please contact us at <a href="mailto:${SUPPORT_EMAIL}" style="color:#2563eb">${SUPPORT_EMAIL}</a>.</p>`),
+    text: `Hi ${toName},\n\nYour ${relation} ${byName} has created an Arintu account for you.\n\nEmail: ${toEmail}\nTemporary password: ${tempPassword}\n\nSign in at: ${FRONTEND_URL()}/login\n\nYou will need to upload your ID and set a new password after first login.`,
+  });
+}
+
+/**
+ * Sent when two existing accounts are linked (no new account created).
+ * role: 'parent' → email goes to student ("your parent X linked with you")
+ * role: 'child'  → email goes to parent  ("your child X linked with you")
+ */
+async function sendFamilyLinked({ toEmail, toName, byName, role }) {
+  const isChild = role === 'child';   // byName is the child/student who triggered the link
+  const subject = isChild
+    ? `Your child ${byName} has linked their Arintu account with yours`
+    : `Your parent ${byName} has linked their Arintu account with yours`;
+
+  await sendMail({
+    to: toEmail,
+    subject,
+    html: wrap(`
+      <h2 style="color:#1e293b;margin:0 0 8px">Family Account Linked</h2>
+      <p>Hi ${toName},</p>
+      <p>Your ${isChild ? 'child' : 'parent'} <strong>${byName}</strong> has linked their Arintu account with yours.</p>
+      <p>You can now see each other's activity on the platform. Sign in to view your family dashboard.</p>
+      ${btn(FRONTEND_URL() + '/login', 'Go to Arintu')}`),
+    text: `Hi ${toName},\n\nYour ${isChild ? 'child' : 'parent'} ${byName} has linked their Arintu account with yours.\n\nSign in at: ${FRONTEND_URL()}/login`,
+  });
+}
+
 module.exports = {
   sendPasswordReset,
   sendAccountApproved,
@@ -290,4 +351,6 @@ module.exports = {
   sendEnrolled,
   sendScheduleUpdate,
   send2FACode,
+  sendFamilyWelcome,
+  sendFamilyLinked,
 };

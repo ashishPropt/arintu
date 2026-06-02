@@ -33,6 +33,11 @@ export default function Login() {
         localStorage.setItem('arintu_token', res.data.token);
         await reload();
         navigate('/pending-verification', { replace: true });
+      } else if (res.data.mustChangePassword) {
+        // Account was created by a family member — must set own password first
+        localStorage.setItem('arintu_token', res.data.token);
+        await reload();
+        navigate('/change-password', { replace: true });
       } else if (res.data.require2fa) {
         // Need TOTP code — show second step
         setPendingToken(res.data.pendingToken);
