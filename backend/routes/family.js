@@ -62,6 +62,65 @@ router.get('/parent', authenticate, async (req, res) => {
   }
 });
 
+// ── GET /api/family/children/:childId/classes ─────────────────────────────────
+router.get('/children/:childId/classes', authenticate, async (req, res) => {
+  if (req.user.role !== 'parent') {
+    return res.status(403).json({ error: 'Parents only' });
+  }
+  try {
+    const child = await db.query(
+      'SELECT id FROM users WHERE id = $1 AND parent_id = $2',
+      [req.params.childId, req.user.id]
+    );
+    if (!child.rows[0]) return res.status(404).json({ error: 'Child not found or not linked to your account' });
+
+    const result = await db.query(
+      `SELECT e.id, e.enrolled_at, e.status,
+              c.id AS class_id, c.name AS class_name, c.subject, c.description, c.is_active
+       FROM enrollments e
+       JOIN classes c ON c.id = e.class_id
+       WHERE e.student_id = $1
+       ORDER BY c.name`,
+      [req.params.childId]
+    );
+    res.json(result.rows);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// ── GET /api/family/children/:childId/schedule ────────────────────────────────
+router.get('/children/:childId/schedule', authenticate, async (req, res) => {
+  if (req.user.role !== 'parent') {
+    return res.status(403).json({ error: 'Parents only' });
+  }
+  try {
+    const child = await db.query(
+      'SELECT id FROM users WHERE id = $1 AND parent_id = $2',
+      [req.params.childId, req.user.id]
+    );
+    if (!child.rows[0]) return res.status(404).json({ error: 'Child not found or not linked to your account' });
+
+    const result = await db.query(
+      `SELECT cs.id, cs.title, cs.start_time, cs.end_time,
+              cs.zoom_join_url, cs.notes, cs.recurring_type,
+              c.name AS class_name, c.subject
+       FROM class_schedules cs
+       JOIN classes      c  ON c.id  = cs.class_id
+       JOIN enrollments  e  ON e.class_id = cs.class_id AND e.student_id = $1
+       WHERE cs.start_time >= NOW()
+       ORDER BY cs.start_time ASC
+       LIMIT 30`,
+      [req.params.childId]
+    );
+    res.json(result.rows);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
 // ── GET /api/family/children/:childId/applications ────────────────────────────
 router.get('/children/:childId/applications', authenticate, async (req, res) => {
   if (req.user.role !== 'parent') {
