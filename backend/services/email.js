@@ -336,6 +336,23 @@ async function sendFamilyLinked({ toEmail, toName, byName, role }) {
   });
 }
 
+// ── Session recording available ────────────────────────────────────────────────
+async function sendRecordingAvailable({ toEmail, toName, className, title, recordingUrl }) {
+  await sendMail({
+    to: toEmail,
+    subject: `Recording available — ${className}`,
+    html: wrap(`
+      <h2 style="color:#1e293b;margin:0 0 8px">Session Recording Available 🎥</h2>
+      <p>Hi ${toName},</p>
+      <p>A recording from your class <strong>${className}</strong> is now available:</p>
+      <p style="font-size:15px;font-weight:600;color:#374151;margin:12px 0">${title}</p>
+      <p>Click below to watch the recording at any time.</p>
+      ${btn(recordingUrl, 'Watch Recording', '#2563eb')}
+      <p style="color:#6b7280;font-size:13px">You can also find all recordings for your classes in the <a href="${FRONTEND_URL()}/app/recordings" style="color:#2563eb">Recordings</a> section of your dashboard.</p>`),
+    text: `Hi ${toName},\n\nA recording from ${className} is now available:\n${title}\n\nWatch it here: ${recordingUrl}\n\nAll recordings: ${FRONTEND_URL()}/app/recordings`,
+  });
+}
+
 module.exports = {
   sendPasswordReset,
   sendAccountApproved,
@@ -353,4 +370,5 @@ module.exports = {
   send2FACode,
   sendFamilyWelcome,
   sendFamilyLinked,
+  sendRecordingAvailable,
 };

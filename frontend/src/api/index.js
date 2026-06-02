@@ -198,4 +198,9 @@ export const mathwave = {
   results: (studentId, classId) => api.get(`/mathwave/results/${studentId}`, { params: { classId } }),
 };
 
+export const recordings = {
+  list: () => api.get('/recordings'),
+  byClass: (classId) => api.get(`/recordings/class/${classId}`),
+};
+
 export default api;

@@ -17,6 +17,13 @@ app.post(
   require('./routes/stripeWebhook')
 );
 
+// ── Zoom webhook also needs the raw body for HMAC signature verification ──────
+app.post(
+  '/api/zoom/webhook',
+  express.raw({ type: 'application/json' }),
+  require('./routes/zoomWebhook')
+);
+
 app.use(express.json());
 
 // Routes
@@ -37,6 +44,7 @@ app.use('/api/public',        require('./routes/public'));
 app.use('/api/verification',  require('./routes/verification'));
 app.use('/api/worksheets',    require('./routes/worksheets'));
 app.use('/api/family',        require('./routes/family'));
+app.use('/api/recordings',    require('./routes/recordings'));
 
 app.get('/api/health', (req, res) => res.json({ status: 'ok', version: '1.0.0' }));
 

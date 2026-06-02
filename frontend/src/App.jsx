@@ -24,6 +24,7 @@ import PendingVerification from './pages/PendingVerification';
 import ForcePasswordChange from './pages/ForcePasswordChange';
 import Family from './pages/Family';
 import TwoFactorSetup from './pages/TwoFactorSetup';
+import Recordings from './pages/Recordings';
 
 // Public content pages
 import Team from './pages/public/Team';
@@ -151,6 +152,7 @@ export default function App() {
                 <Family />
               </RequireAuth>
             } />
+            <Route path="recordings" element={<Recordings />} />
             <Route path="security" element={<TwoFactorSetup />} />
           </Route>
 

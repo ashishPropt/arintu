@@ -11,6 +11,7 @@ const navByRole = {
     { to: '/app/pricing',          label: 'Pricing',              icon: TagIcon },
     { to: '/app/classes',          label: 'All Classes',          icon: BookIcon },
     { to: '/app/schedules',        label: 'Schedules',            icon: CalIcon },
+    { to: '/app/recordings',       label: 'Recordings',           icon: RecordingIcon },
     { to: '/app/applications',     label: 'Student Applications', icon: ClipboardIcon },
     { to: '/app/verification',     label: 'ID Verification',      icon: ShieldIcon },
     { to: '/app/scholarships',     label: 'Scholarships',         icon: ScholarshipIcon },
@@ -21,6 +22,7 @@ const navByRole = {
     { to: '/app/security',     label: 'Security (2FA)',       icon: ShieldIcon },
     { to: '/app/classes',      label: 'Classes',              icon: BookIcon },
     { to: '/app/schedules',    label: 'Schedules',            icon: CalIcon },
+    { to: '/app/recordings',   label: 'Recordings',           icon: RecordingIcon },
     { to: '/app/users',        label: 'Users',                icon: UsersIcon },
     { to: '/app/applications', label: 'Student Applications', icon: ClipboardIcon },
     { to: '/app/verification', label: 'ID Verification',      icon: ShieldIcon },
@@ -29,18 +31,21 @@ const navByRole = {
     { to: '/app/dashboard',  label: 'Dashboard',  icon: HomeIcon },
     { to: '/app/classes',    label: 'My Classes', icon: BookIcon },
     { to: '/app/schedules',  label: 'Schedule',   icon: CalIcon },
+    { to: '/app/recordings', label: 'Recordings', icon: RecordingIcon },
     { to: '/app/security',   label: 'Security',   icon: ShieldIcon },
   ],
   student: [
     { to: '/app/dashboard',  label: 'Dashboard',  icon: HomeIcon },
     { to: '/app/classes',    label: 'My Classes', icon: BookIcon },
     { to: '/app/schedules',  label: 'Schedule',   icon: CalIcon },
+    { to: '/app/recordings', label: 'Recordings', icon: RecordingIcon },
     { to: '/app/family',     label: 'My Family',  icon: FamilyIcon },
     { to: '/app/security',   label: 'Security',   icon: ShieldIcon },
   ],
   parent: [
-    { to: '/app/dashboard',  label: 'Dashboard',  icon: HomeIcon },
+    { to: '/app/dashboard',  label: 'Dashboard',   icon: HomeIcon },
     { to: '/app/family',     label: 'My Children', icon: FamilyIcon },
+    { to: '/app/recordings', label: 'Recordings',  icon: RecordingIcon },
     { to: '/app/security',   label: 'Security',    icon: ShieldIcon },
   ],
 };
@@ -220,6 +225,13 @@ function FamilyIcon({ className }) {
   return (
     <svg className={className} viewBox="0 0 20 20" fill="currentColor">
       <path d="M9 6a3 3 0 11-6 0 3 3 0 016 0zM17 6a3 3 0 11-6 0 3 3 0 016 0zM12.93 17c.046-.327.07-.66.07-1a6.97 6.97 0 00-1.5-4.33A5 5 0 0119 16v1h-6.07zM6 11a5 5 0 015 5v1H1v-1a5 5 0 015-5z"/>
+    </svg>
+  );
+}
+function RecordingIcon({ className }) {
+  return (
+    <svg className={className} viewBox="0 0 20 20" fill="currentColor">
+      <path d="M2 6a2 2 0 012-2h6a2 2 0 012 2v8a2 2 0 01-2 2H4a2 2 0 01-2-2V6zM14.553 7.106A1 1 0 0014 8v4a1 1 0 00.553.894l2 1A1 1 0 0018 13V7a1 1 0 00-1.447-.894l-2 1z"/>
     </svg>
   );
 }
