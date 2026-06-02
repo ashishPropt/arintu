@@ -49,12 +49,24 @@ export default function Schedules() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
+      // Use end-of-day for the `to` param so Sunday sessions aren't cut off
       const from = week.toISOString();
-      const to = addDays(week, 6).toISOString();
-      const res = await schedulesApi.list({ from, to });
+      const to   = new Date(addDays(week, 6).setHours(23, 59, 59, 999)).toISOString();
+      const res  = await schedulesApi.list({ from, to });
       setItems(res.data || []);
     } catch {} finally { setLoading(false); }
   }, [week]);
+
+  // Jump the calendar to the week containing the next upcoming session
+  const jumpToNextSession = useCallback(async () => {
+    try {
+      const res = await schedulesApi.list({ from: new Date().toISOString() });
+      const upcoming = (res.data || []);
+      if (upcoming.length === 0) return;
+      const nextStart = new Date(upcoming[0].start_time);
+      setWeek(startOfWeek(nextStart, { weekStartsOn: 1 }));
+    } catch {}
+  }, []);
 
   useEffect(() => { load(); }, [load]);
 
@@ -94,6 +106,7 @@ export default function Schedules() {
         <div className="flex items-center gap-2">
           <button onClick={() => setWeek((w) => addDays(w, -7))} className="btn-secondary px-3">←</button>
           <button onClick={() => setWeek(startOfWeek(new Date(), { weekStartsOn: 1 }))} className="btn-secondary px-3 text-xs">Today</button>
+          <button onClick={jumpToNextSession} className="btn-secondary px-3 text-xs" title="Jump to next scheduled session">Next Session →</button>
           <button onClick={() => setWeek((w) => addDays(w, 7))} className="btn-secondary px-3">→</button>
           {canCreateZoom && (
             <button onClick={() => setShowZoomSetup(true)}
@@ -191,6 +204,23 @@ function CreateScheduleModal({ classes, onClose, onCreated, onBulkZoom }) {
 
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
 
+  // When the start date/time changes, keep endTime on the same calendar date
+  // (just shift the date portion so the duration stays sensible).
+  const handleStartChange = (newStart) => {
+    set('startTime', newStart);
+    if (newStart && form.endTime) {
+      const startDate = newStart.split('T')[0];
+      const endTimePart = form.endTime.split('T')[1] || '';
+      if (endTimePart) set('endTime', `${startDate}T${endTimePart}`);
+    } else if (newStart && !form.endTime) {
+      // Pre-fill endTime as start + 1 hour
+      const startDate = new Date(newStart);
+      startDate.setHours(startDate.getHours() + 1);
+      const pad = (n) => String(n).padStart(2, '0');
+      set('endTime', `${newStart.split('T')[0]}T${pad(startDate.getHours())}:${pad(startDate.getMinutes())}`);
+    }
+  };
+
   const isRecurring    = form.recurringType !== 'once';
   const minRepeatUntil = form.startTime ? form.startTime.split('T')[0] : undefined;
 
@@ -207,6 +237,12 @@ function CreateScheduleModal({ classes, onClose, onCreated, onBulkZoom }) {
   const submit = async (e) => {
     e.preventDefault();
     setLoading(true); setError('');
+    // Client-side guard: end must be after start
+    if (form.endTime && form.startTime && new Date(form.endTime) <= new Date(form.startTime)) {
+      setError('Session end time must be after the start time.');
+      setLoading(false);
+      return;
+    }
     try {
       const payload = {
         classId:       form.classId,
@@ -259,7 +295,7 @@ function CreateScheduleModal({ classes, onClose, onCreated, onBulkZoom }) {
           <div>
             <label className="block text-xs font-medium text-gray-700 mb-1">First session starts *</label>
             <input type="datetime-local" className="input" value={form.startTime}
-              onChange={(e) => set('startTime', e.target.value)} required />
+              onChange={(e) => handleStartChange(e.target.value)} required />
           </div>
           <div>
             <label className="block text-xs font-medium text-gray-700 mb-1">First session ends *</label>

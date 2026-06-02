@@ -99,6 +99,11 @@ router.post(
 
     const { classId, title, startTime, endTime, recurringType, repeatUntil, notes } = req.body;
 
+    // Validate end is after start
+    if (new Date(endTime) <= new Date(startTime)) {
+      return res.status(400).json({ error: 'Session end time must be after the start time.' });
+    }
+
     // Validate repeatUntil is after startTime when provided
     if (repeatUntil && new Date(repeatUntil) <= new Date(startTime)) {
       return res.status(400).json({ error: '"Repeat until" date must be after the session start date.' });
