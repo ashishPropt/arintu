@@ -1,9 +1,10 @@
-import { NavLink, useNavigate } from 'react-router-dom';
+import { NavLink, Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import Logo from './Logo';
 
 const navByRole = {
   superadmin: [
+    { to: '/',                     label: 'Home',                 icon: PublicHomeIcon, end: true },
     { to: '/app/dashboard',        label: 'Dashboard',            icon: HomeIcon },
     { to: '/app/security',         label: 'Security (2FA)',       icon: ShieldIcon },
     { to: '/app/pending-accounts', label: 'Pending Accounts',     icon: PendingIcon },
@@ -18,6 +19,7 @@ const navByRole = {
     { to: '/app/manage-team',      label: 'Team Members',         icon: TeamIcon },
   ],
   admin: [
+    { to: '/',                 label: 'Home',                 icon: PublicHomeIcon, end: true },
     { to: '/app/dashboard',    label: 'Dashboard',            icon: HomeIcon },
     { to: '/app/security',     label: 'Security (2FA)',       icon: ShieldIcon },
     { to: '/app/classes',      label: 'Classes',              icon: BookIcon },
@@ -28,6 +30,7 @@ const navByRole = {
     { to: '/app/verification', label: 'ID Verification',      icon: ShieldIcon },
   ],
   teacher: [
+    { to: '/',               label: 'Home',        icon: PublicHomeIcon, end: true },
     { to: '/app/dashboard',  label: 'Dashboard',  icon: HomeIcon },
     { to: '/app/classes',    label: 'My Classes', icon: BookIcon },
     { to: '/app/schedules',  label: 'Schedule',   icon: CalIcon },
@@ -35,6 +38,7 @@ const navByRole = {
     { to: '/app/security',   label: 'Security',   icon: ShieldIcon },
   ],
   student: [
+    { to: '/',               label: 'Home',        icon: PublicHomeIcon, end: true },
     { to: '/app/dashboard',  label: 'Dashboard',  icon: HomeIcon },
     { to: '/app/classes',    label: 'My Classes', icon: BookIcon },
     { to: '/app/schedules',  label: 'Schedule',   icon: CalIcon },
@@ -43,6 +47,7 @@ const navByRole = {
     { to: '/app/security',   label: 'Security',   icon: ShieldIcon },
   ],
   parent: [
+    { to: '/',               label: 'Home',         icon: PublicHomeIcon, end: true },
     { to: '/app/dashboard',  label: 'Dashboard',   icon: HomeIcon },
     { to: '/app/family',     label: 'My Children', icon: FamilyIcon },
     { to: '/app/recordings', label: 'Recordings',  icon: RecordingIcon },
@@ -66,25 +71,30 @@ export default function Sidebar() {
   return (
     <aside className="w-56 shrink-0 flex flex-col bg-white border-r border-gray-100 h-screen sticky top-0">
       <div className="px-5 py-5 border-b border-gray-100">
-        <Logo size="md" />
+        <Link to="/"><Logo size="md" /></Link>
       </div>
 
       <nav className="flex-1 px-3 py-4 space-y-0.5 overflow-y-auto">
-        {items.map(({ to, label, icon: Icon }) => (
-          <NavLink
-            key={to}
-            to={to}
-            className={({ isActive }) =>
-              `flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-                isActive
-                  ? 'bg-brand-50 text-brand-700'
-                  : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
-              }`
-            }
-          >
-            <Icon className="w-4 h-4 shrink-0" />
-            {label}
-          </NavLink>
+        {items.map(({ to, label, icon: Icon, end }, idx) => (
+          <>
+            <NavLink
+              key={to}
+              to={to}
+              end={!!end}
+              className={({ isActive }) =>
+                `flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                  isActive
+                    ? 'bg-brand-50 text-brand-700'
+                    : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                }`
+              }
+            >
+              <Icon className="w-4 h-4 shrink-0" />
+              {label}
+            </NavLink>
+            {/* Divider after Home link */}
+            {idx === 0 && <div className="my-1 border-t border-gray-100" />}
+          </>
         ))}
       </nav>
 
@@ -107,6 +117,13 @@ export default function Sidebar() {
   );
 }
 
+function PublicHomeIcon({ className }) {
+  return (
+    <svg className={className} viewBox="0 0 20 20" fill="currentColor">
+      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM4.332 8.027a6.012 6.012 0 011.912-2.706C6.512 5.73 6.974 6 7.5 6A1.5 1.5 0 019 7.5V8a2 2 0 004 0 2 2 0 011.523-1.943A5.977 5.977 0 0116 10c0 .34-.028.675-.083 1H15a2 2 0 00-2 2v2.197A5.973 5.973 0 0110 16v-2a2 2 0 00-2-2 2 2 0 01-2-2 2 2 0 00-1.668-1.973z" clipRule="evenodd"/>
+    </svg>
+  );
+}
 function HomeIcon({ className }) {
   return (
     <svg className={className} viewBox="0 0 20 20" fill="currentColor">
