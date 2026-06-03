@@ -49,16 +49,17 @@ router.get('/', authenticate, async (req, res) => {
         WHERE c.is_active = TRUE ${search ? `AND c.name ILIKE $2` : ''}`;
       countParams = search ? [userId, `%${search}%`] : [userId];
     } else if (role === 'admin') {
+      // Admins see all classes (single-org setup)
       query = `
         SELECT c.*, u.name as admin_name,
                (SELECT COUNT(*) FROM enrollments e WHERE e.class_id = c.id) as enrolled_count
         FROM classes c
         JOIN users u ON u.id = c.admin_id
-        WHERE c.admin_id = $1 ${search ? `AND c.name ILIKE $2` : ''}
-        ORDER BY c.created_at DESC LIMIT ${search ? '$3' : '$2'} OFFSET ${search ? '$4' : '$3'}`;
-      params = search ? [userId, `%${search}%`, limit, offset] : [userId, limit, offset];
-      countQuery = `SELECT COUNT(*) FROM classes WHERE admin_id = $1 ${search ? `AND name ILIKE $2` : ''}`;
-      countParams = search ? [userId, `%${search}%`] : [userId];
+        ${search ? `WHERE c.name ILIKE $1` : ''}
+        ORDER BY c.created_at DESC LIMIT ${search ? '$2' : '$1'} OFFSET ${search ? '$3' : '$2'}`;
+      params = search ? [`%${search}%`, limit, offset] : [limit, offset];
+      countQuery = `SELECT COUNT(*) FROM classes ${search ? `WHERE name ILIKE $1` : ''}`;
+      countParams = search ? [`%${search}%`] : [];
     } else {
       // superadmin sees all
       query = `

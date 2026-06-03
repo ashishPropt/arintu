@@ -62,9 +62,7 @@ router.get('/', authenticate, async (req, res) => {
     } else if (role === 'teacher') {
       where.push(`EXISTS (SELECT 1 FROM teacher_assignments ta WHERE ta.class_id = cs.class_id AND ta.teacher_id = $${idx++})`);
       params.push(userId);
-    } else if (role === 'admin') {
-      where.push(`EXISTS (SELECT 1 FROM classes c WHERE c.id = cs.class_id AND c.admin_id = $${idx++})`);
-      params.push(userId);
+    // admin sees all schedules (single-org setup)
     }
 
     const result = await db.query(
