@@ -70,7 +70,7 @@ async function uploadFromUrl(downloadUrl, storageKey, contentType = 'video/mp4')
     }));
 
     const publicUrl = `${VULTR_OS_PUBLIC_BASE_URL.replace(/\/$/, '')}/${storageKey}`;
-    return { publicUrl, fileSizeBytes: stat.size };
+    return { publicUrl, fileSizeBytes: fileBuffer.length };
   } finally {
     // Always clean up the temp file
     try { fs.unlinkSync(tmpFile); } catch {}
@@ -83,31 +83,24 @@ async function uploadFromUrl(downloadUrl, storageKey, contentType = 'video/mp4')
 function downloadToFile(url, dest) {
   return new Promise((resolve, reject) => {
     const file = fs.createWriteStream(dest);
-    const protocol = url.startsWith('https') ? https : http;
+    let redirects = 0;
 
     function doGet(targetUrl) {
-      protocol.get(targetUrl, (res) => {
+      if (redirects > 10) return reject(new Error('Too many redirects'));
+      const proto = targetUrl.startsWith('https') ? https : http;
+      proto.get(targetUrl, (res) => {
         // Follow redirects (Zoom uses signed S3 URLs with redirect chains)
-        if (res.statusCode === 301 || res.statusCode === 302 || res.statusCode === 307) {
+        if (res.statusCode === 301 || res.statusCode === 302 || res.statusCode === 307 || res.statusCode === 308) {
           const location = res.headers.location;
           if (!location) return reject(new Error('Redirect without location header'));
           res.resume();
-          // Redirect may switch protocol
-          const redirProtocol = location.startsWith('https') ? https : http;
-          redirProtocol.get(location, (res2) => {
-            if (res2.statusCode !== 200) {
-              res2.resume();
-              return reject(new Error(`Download failed after redirect: HTTP ${res2.statusCode}`));
-            }
-            res2.pipe(file);
-            file.on('finish', () => file.close(resolve));
-            file.on('error', reject);
-          }).on('error', reject);
+          redirects++;
+          doGet(location);
           return;
         }
         if (res.statusCode !== 200) {
           res.resume();
-          return reject(new Error(`Download failed: HTTP ${res.statusCode}`));
+          return reject(new Error(`Download failed: HTTP ${res.statusCode} from ${targetUrl}`));
         }
         res.pipe(file);
         file.on('finish', () => file.close(resolve));
