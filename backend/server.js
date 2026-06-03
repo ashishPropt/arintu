@@ -18,7 +18,9 @@ app.post(
 );
 
 // ── Zoom webhook also needs the raw body for HMAC signature verification ──────
-app.post(
+// Must use app.use() (not app.post()) so Express strips the path prefix before
+// passing to the router — otherwise router.post('/') never matches.
+app.use(
   '/api/zoom/webhook',
   express.raw({ type: 'application/json' }),
   require('./routes/zoomWebhook')
