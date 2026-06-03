@@ -81,7 +81,7 @@ export default function PublicLayout() {
               to="/"
               className="text-sm font-medium text-gray-600 hover:text-gray-900 px-3 py-2 rounded-lg hover:bg-gray-50 transition-colors"
             >
-              Classes
+              Home
             </Link>
             <NavDropdown label="About Us" links={aboutLinks} />
             <NavDropdown label="Community" links={communityLinks} />
@@ -125,7 +125,7 @@ export default function PublicLayout() {
         {/* Mobile nav drawer */}
         {mobileOpen && (
           <div className="md:hidden border-t border-gray-100 bg-white px-4 py-3 space-y-1">
-            <MobileSection label="Classes" links={[{ to: '/', label: 'Browse Classes' }]} onNav={() => setMobileOpen(false)} />
+            <MobileSection label="Home" links={[{ to: '/', label: 'Home' }]} onNav={() => setMobileOpen(false)} />
             <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider pt-2 pb-1 px-2">About Us</p>
             {aboutLinks.map(({ to, label }) => (
               <Link key={to} to={to} onClick={() => setMobileOpen(false)}

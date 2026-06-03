@@ -103,8 +103,92 @@ export default function Landing() {
         </div>
       </section>
 
+      {/* About Enfinitty */}
+      <section className="max-w-6xl mx-auto px-4 sm:px-6 pb-12">
+        <div className="bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden">
+          {/* Top accent bar */}
+          <div className="h-1.5 bg-gradient-to-r from-brand-500 to-accent-500" />
+
+          <div className="p-8 sm:p-10">
+            {/* Headline */}
+            <div className="flex items-center gap-3 mb-6">
+              <div className="w-10 h-10 rounded-xl bg-brand-50 flex items-center justify-center shrink-0">
+                <svg className="w-5 h-5 text-brand-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/>
+                </svg>
+              </div>
+              <h2 className="text-xl sm:text-2xl font-bold text-gray-900">About Enfinitty</h2>
+            </div>
+
+            <div className="grid sm:grid-cols-2 gap-8 text-sm text-gray-600 leading-relaxed">
+              {/* Left column */}
+              <div className="space-y-4">
+                <p>
+                  Having realized the need to serve students across the world, Shiv Keyal and team created{' '}
+                  <strong className="text-gray-800">Enfinitty, Inc.</strong> in 2021. Enfinitty (infinity + affinity)
+                  is working to expand educational opportunities for students around the globe. Enfinitty's fundamental
+                  philosophy is nurturing aspiring young minds through dynamic educational opportunities to inspire
+                  innovation, creativity, and ingenuity.
+                </p>
+                <p>
+                  Comprising a team of passionate adults and board members with extensive educational experience,
+                  Enfinitty takes pride in caring about, and believing in, student centered achievement. We are here to
+                  mentor and support students from around the world and provide exceptional educational experiences that
+                  prepare them for life. Students need to be excited and engaged in order to achieve academic excellence.
+                  Enfinitty's goal is just to provide this opportunity.
+                </p>
+                <p>
+                  We also believe in giving back to the community we serve. To support this commitment,{' '}
+                  <strong className="text-gray-800">20% of our seats are reserved</strong> for students with
+                  demonstrated financial need.
+                </p>
+              </div>
+
+              {/* Right column */}
+              <div className="space-y-5">
+                {/* Alumni achievements */}
+                <div className="bg-brand-50 rounded-2xl p-5">
+                  <p className="font-semibold text-gray-900 mb-2">🎓 Alumni Achievements</p>
+                  <p className="text-sm text-gray-600 leading-relaxed mb-3">
+                    Over the past several years, our students have achieved outstanding results. They have been admitted
+                    to leading universities, including:
+                  </p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {[
+                      'UC San Diego', 'UCLA', 'UC Berkeley', 'Caltech',
+                      'Harvey Mudd College', 'Claremont McKenna', 'Yale',
+                      'MIT', 'Stanford', 'Harvard', 'U of Chicago', 'Northwestern',
+                    ].map((u) => (
+                      <span key={u} className="inline-block bg-white border border-brand-100 text-brand-700 text-xs font-medium px-2.5 py-1 rounded-full">
+                        {u}
+                      </span>
+                    ))}
+                    <span className="inline-block bg-white border border-gray-100 text-gray-500 text-xs px-2.5 py-1 rounded-full italic">
+                      and more
+                    </span>
+                  </div>
+                </div>
+
+                <p className="text-sm text-gray-600 leading-relaxed">
+                  Many of our alumni have since graduated from college, entered the workforce, and gone on to build
+                  successful careers. We invite you to visit our{' '}
+                  <a href="/about/history" className="text-brand-600 font-medium hover:underline">
+                    History page
+                  </a>{' '}
+                  to learn more about their experiences and achievements.
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* Classes grid */}
-      <section className="max-w-6xl mx-auto px-4 sm:px-6 pb-16 -mt-2">
+      <section className="max-w-6xl mx-auto px-4 sm:px-6 pb-16">
+        <div className="flex items-center gap-3 mb-6">
+          <h2 className="text-xl font-bold text-gray-900">Our Classes</h2>
+          <div className="flex-1 h-px bg-gray-100" />
+        </div>
         {loading ? (
           <div className="text-center py-16 text-gray-400">Loading classes…</div>
         ) : classes.length === 0 ? (
