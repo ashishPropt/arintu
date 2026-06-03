@@ -5,7 +5,7 @@ import Logo from './Logo';
 
 const aboutLinks = [
   { to: '/about/team',    label: 'Team' },
-  { to: '/about/cities',  label: 'Cities' },
+  { to: '/about/cities',  label: 'Country' },
   { to: '/about/hq',      label: 'HQ Address' },
   { to: '/about/history', label: 'History' },
   { to: '/about/jobs',    label: 'Jobs' },
@@ -16,6 +16,7 @@ const communityLinks = [
   { to: '/community/book-club',          label: 'Book Club' },
   { to: '/community/arintu-online',      label: 'Arintu Online' },
   { to: '/community/enfinitty-circle',   label: 'Enfinitty Circle' },
+  { to: '/community/testimonials',       label: 'Testimonials' },
 ];
 
 function NavDropdown({ label, links, onNavigate }) {

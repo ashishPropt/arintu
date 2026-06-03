@@ -31,6 +31,11 @@ const features = [
     title: 'Async Q&A',
     desc: 'Got a question between sessions? Post it in the class channel. Teachers and TAs respond within 24 hours. High-quality answers are pinned for the whole cohort to see.',
   },
+  {
+    icon: '👨‍👩‍👧',
+    title: 'Parent Sync',
+    desc: 'Parents stay fully in the loop. All class communications, session summaries, progress updates, and schedule changes are automatically shared with parents so families are always informed.',
+  },
 ];
 
 export default function ArintuOnline() {

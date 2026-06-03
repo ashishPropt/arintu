@@ -14,7 +14,7 @@ export default function HQAddress() {
           </div>
           <h2 className="font-semibold text-gray-900 mb-1">Mailing Address</h2>
           <address className="not-italic text-sm text-gray-600 leading-relaxed">
-            Arintu Learning Inc.<br />
+            Arintu<br />
             12268 Darkwood Road<br />
             San Diego, CA 92129<br />
             United States
@@ -61,7 +61,7 @@ export default function HQAddress() {
           </div>
           <h2 className="font-semibold text-gray-900 mb-1">Global Reach</h2>
           <p className="text-sm text-gray-600 leading-relaxed">
-            Headquartered in the San Francisco Bay Area, Arintu serves learners across more than 15 countries on 4 continents.
+            Headquartered in the San Diego area, Arintu plans to serve learners from around the world.
           </p>
         </div>
       </div>

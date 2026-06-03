@@ -41,6 +41,7 @@ import Terms from './pages/public/Terms';
 import Privacy from './pages/public/Privacy';
 import PaymentSuccess from './pages/public/PaymentSuccess';
 import PaymentCancel from './pages/public/PaymentCancel';
+import Testimonials from './pages/public/Testimonials';
 
 function RequireAuth({ children, roles }) {
   const { user, loading } = useAuth();
@@ -88,6 +89,7 @@ export default function App() {
             <Route path="/community/book-club"        element={<BookClub />} />
             <Route path="/community/arintu-online"    element={<ArintuOnline />} />
             <Route path="/community/enfinitty-circle" element={<EnfinittyCircle />} />
+            <Route path="/community/testimonials"     element={<Testimonials />} />
             <Route path="/contact"         element={<ContactUs />} />
             <Route path="/terms"           element={<Terms />} />
             <Route path="/privacy"         element={<Privacy />} />
