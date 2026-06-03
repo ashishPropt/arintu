@@ -68,9 +68,11 @@ router.get('/', authenticate, async (req, res) => {
     }
 
     const result = await db.query(
-      `SELECT cs.*, c.name as class_name, c.subject
+      `SELECT cs.*, c.name as class_name, c.subject, c.code as class_code,
+              t.name as teacher_name, t.id as teacher_id
        FROM class_schedules cs
        JOIN classes c ON c.id = cs.class_id
+       LEFT JOIN users t ON t.id = cs.teacher_id
        WHERE ${where.join(' AND ')}
        ORDER BY cs.start_time ASC`,
       params
@@ -97,7 +99,7 @@ router.post(
     const errors = validationResult(req);
     if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
 
-    const { classId, title, startTime, endTime, recurringType, repeatUntil, notes } = req.body;
+    const { classId, title, startTime, endTime, recurringType, repeatUntil, notes, teacherId, sessionCode } = req.body;
 
     // Validate end is after start
     if (new Date(endTime) <= new Date(startTime)) {
@@ -121,10 +123,14 @@ router.post(
         for (const occ of occurrences) {
           const r = await client.query(
             `INSERT INTO class_schedules
-               (class_id, title, start_time, end_time, recurring_type, notes)
-             VALUES ($1, $2, $3, $4, $5, $6)
+               (class_id, title, start_time, end_time, recurring_type, notes, teacher_id, session_code)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
              RETURNING *`,
-            [classId, title || null, occ.start.toISOString(), occ.end.toISOString(), recurringType || 'once', notes || null]
+            [classId, title || null, occ.start.toISOString(), occ.end.toISOString(),
+             recurringType || 'once', notes || null,
+             teacherId || null,
+             // Only the first occurrence gets the session_code; subsequent ones auto-number
+             occurrences.length === 1 ? (sessionCode || null) : null]
           );
           created.push(r.rows[0]);
         }
@@ -229,8 +235,12 @@ router.post('/bulk-zoom', authenticate, authorize('admin', 'superadmin', 'teache
 // GET /api/schedules/:id
 router.get('/:id', authenticate, async (req, res) => {
   const result = await db.query(
-    `SELECT cs.*, c.name as class_name FROM class_schedules cs
-     JOIN classes c ON c.id = cs.class_id WHERE cs.id = $1`,
+    `SELECT cs.*, c.name as class_name, c.code as class_code,
+            t.name as teacher_name
+     FROM class_schedules cs
+     JOIN classes c ON c.id = cs.class_id
+     LEFT JOIN users t ON t.id = cs.teacher_id
+     WHERE cs.id = $1`,
     [req.params.id]
   );
   if (!result.rows[0]) return res.status(404).json({ error: 'Schedule not found' });
@@ -239,7 +249,7 @@ router.get('/:id', authenticate, async (req, res) => {
 
 // PUT /api/schedules/:id
 router.put('/:id', authenticate, authorize('admin', 'superadmin'), async (req, res) => {
-  const { title, startTime, endTime, recurringType, notes } = req.body;
+  const { title, startTime, endTime, recurringType, notes, teacherId, sessionCode } = req.body;
   try {
     const result = await db.query(
       `UPDATE class_schedules SET
@@ -248,9 +258,11 @@ router.put('/:id', authenticate, authorize('admin', 'superadmin'), async (req, r
          end_time = COALESCE($3, end_time),
          recurring_type = COALESCE($4, recurring_type),
          notes = COALESCE($5, notes),
+         teacher_id = COALESCE($6, teacher_id),
+         session_code = COALESCE($7, session_code),
          updated_at = NOW()
-       WHERE id = $6 RETURNING *`,
-      [title, startTime, endTime, recurringType, notes, req.params.id]
+       WHERE id = $8 RETURNING *`,
+      [title, startTime, endTime, recurringType, notes, teacherId || null, sessionCode || null, req.params.id]
     );
     if (!result.rows[0]) return res.status(404).json({ error: 'Schedule not found' });
     res.json(result.rows[0]);

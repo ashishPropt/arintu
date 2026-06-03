@@ -182,8 +182,15 @@ export default function Schedules() {
                   <p className="text-xs text-gray-400">{format(new Date(s.start_time), 'MMM')}</p>
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-semibold text-gray-900 truncate">{s.class_name}</p>
-                  {s.title && <p className="text-xs text-gray-500 truncate">{s.title}</p>}
+                  <div className="flex items-center gap-1.5">
+                    <p className="text-sm font-semibold text-gray-900 truncate">{s.class_name}</p>
+                    {s.session_code && (
+                      <span className="shrink-0 text-[10px] font-mono bg-gray-100 text-gray-500 px-1 py-0.5 rounded">
+                        {s.session_code}
+                      </span>
+                    )}
+                  </div>
+                  {s.teacher_name && <p className="text-xs text-gray-500 truncate">👤 {s.teacher_name}</p>}
                   <p className="text-xs text-gray-400">
                     {format(new Date(s.start_time), 'h:mm a')} – {format(new Date(s.end_time), 'h:mm a')}
                   </p>
@@ -229,9 +236,21 @@ export default function Schedules() {
 function ScheduleCard({ schedule: s, isAdmin, canCreateZoom, onCreateZoom, onDeleted }) {
   return (
     <div className="bg-brand-50 border border-brand-100 rounded-lg p-2 text-xs group">
-      <p className="font-semibold text-brand-900 truncate">{s.class_name}</p>
+      <div className="flex items-start justify-between gap-1">
+        <p className="font-semibold text-brand-900 truncate leading-tight">{s.class_name}</p>
+        {s.session_code && (
+          <span className="shrink-0 text-[10px] font-mono bg-brand-100 text-brand-700 px-1 py-0.5 rounded">
+            {s.session_code}
+          </span>
+        )}
+      </div>
       <p className="text-brand-600">{format(new Date(s.start_time), 'h:mm')}–{format(new Date(s.end_time), 'h:mm a')}</p>
-      {s.title && <p className="text-brand-700 truncate">{s.title}</p>}
+      {s.teacher_name && (
+        <p className="text-gray-500 truncate flex items-center gap-0.5">
+          <span>👤</span> {s.teacher_name}
+        </p>
+      )}
+      {s.title && !s.session_code && <p className="text-brand-700 truncate">{s.title}</p>}
       <div className="mt-1 flex flex-wrap gap-1">
         {s.zoom_join_url ? (
           <a href={s.zoom_join_url} target="_blank" rel="noopener noreferrer"
@@ -258,14 +277,30 @@ function ScheduleCard({ schedule: s, isAdmin, canCreateZoom, onCreateZoom, onDel
 function CreateScheduleModal({ classes, onClose, onCreated, onBulkZoom }) {
   const [form, setForm] = useState({
     classId: '', title: '', startTime: '', endTime: '',
-    recurringType: 'once', repeatUntil: '', notes: '',
+    recurringType: 'once', repeatUntil: '', notes: '', teacherId: '',
   });
-  const [enableZoom, setEnableZoom] = useState(false);
-  const [loading,    setLoading]    = useState(false);
-  const [error,      setError]      = useState('');
-  const [zoomBusy,   setZoomBusy]   = useState(false);
+  const [enableZoom,    setEnableZoom]    = useState(false);
+  const [loading,       setLoading]       = useState(false);
+  const [error,         setError]         = useState('');
+  const [zoomBusy,      setZoomBusy]      = useState(false);
+  const [classTeachers, setClassTeachers] = useState([]);
 
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
+
+  // Load teachers for the selected class
+  useEffect(() => {
+    if (!form.classId) { setClassTeachers([]); set('teacherId', ''); return; }
+    classesApi.get(form.classId)
+      .then((r) => {
+        const teachers = r.data.teachers || [];
+        setClassTeachers(teachers);
+        // Auto-select if only one teacher
+        if (teachers.length === 1) set('teacherId', teachers[0].id);
+        else set('teacherId', '');
+      })
+      .catch(() => setClassTeachers([]));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [form.classId]);
 
   // When the start date/time changes, keep endTime on the same calendar date
   // (just shift the date portion so the duration stays sensible).
@@ -317,6 +352,7 @@ function CreateScheduleModal({ classes, onClose, onCreated, onBulkZoom }) {
         repeatUntil:   (isRecurring && form.repeatUntil)
                          ? new Date(form.repeatUntil + 'T23:59:59').toISOString()
                          : undefined,
+        teacherId:     form.teacherId || undefined,
       };
       await schedulesApi.create(payload);
 
@@ -343,9 +379,35 @@ function CreateScheduleModal({ classes, onClose, onCreated, onBulkZoom }) {
           <label className="block text-xs font-medium text-gray-700 mb-1">Class *</label>
           <select className="input" value={form.classId} onChange={(e) => set('classId', e.target.value)} required>
             <option value="">Select a class…</option>
-            {classes.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+            {classes.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.code ? `${c.code} — ` : ''}{c.name}
+              </option>
+            ))}
           </select>
         </div>
+
+        {/* Teacher (shown when class has teachers assigned) */}
+        {classTeachers.length > 0 && (
+          <div>
+            <label className="block text-xs font-medium text-gray-700 mb-1">
+              Teacher {classTeachers.length > 1 ? '*' : ''}
+            </label>
+            <select className="input" value={form.teacherId}
+              onChange={(e) => set('teacherId', e.target.value)}
+              required={classTeachers.length > 1}>
+              {classTeachers.length > 1 && <option value="">Select teacher…</option>}
+              {classTeachers.map((t) => (
+                <option key={t.id} value={t.id}>{t.name}</option>
+              ))}
+            </select>
+            {classTeachers.length > 1 && (
+              <p className="text-xs text-gray-400 mt-1">
+                This class has {classTeachers.length} teachers — sessions can have different teachers.
+              </p>
+            )}
+          </div>
+        )}
 
         {/* Title */}
         <div>

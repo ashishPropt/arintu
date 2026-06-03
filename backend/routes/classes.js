@@ -118,15 +118,16 @@ router.post(
     if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
 
     const { name, description, subject, level, maxStudents, enrollmentDeadline, allowLateEnrollment,
-            prerequisiteClassIds } = req.body;
+            prerequisiteClassIds, code } = req.body;
     try {
       const result = await db.query(
         `INSERT INTO classes (name, description, admin_id, subject, level, max_students,
-                             enrollment_deadline, allow_late_enrollment)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+                             enrollment_deadline, allow_late_enrollment, code)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
          RETURNING *`,
         [name, description, req.user.id, subject, level, maxStudents || 30,
-         enrollmentDeadline || null, allowLateEnrollment || false]
+         enrollmentDeadline || null, allowLateEnrollment || false,
+         code ? code.trim().toUpperCase() : null]
       );
       const classId = result.rows[0].id;
 
