@@ -178,12 +178,9 @@ function LoginRedirect() {
   return <Login />;
 }
 
-// Admins and superadmins have no use for the public landing page — send them straight to their dashboard.
+// Show the public landing page to everyone — logged-in users see a Dashboard button in the header.
 function SmartLanding() {
   const { user, loading } = useAuth();
   if (loading) return null;
-  if (user && ['admin', 'superadmin'].includes(user.role)) {
-    return <Navigate to="/app/dashboard" replace />;
-  }
   return <Landing />;
 }
