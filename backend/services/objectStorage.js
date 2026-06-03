@@ -56,17 +56,17 @@ async function uploadFromUrl(downloadUrl, storageKey, contentType = 'video/mp4')
 
   try {
     // Step 2: Upload to Vultr Object Storage
+    // Read into Buffer — avoids AWS SDK v3 streaming compatibility issues with Vultr.
+    // Zoom recordings for 90-min sessions are typically 200–400 MB; well within VPS limits.
     const client = getClient();
-    const fileStream = fs.createReadStream(tmpFile);
-    const stat = fs.statSync(tmpFile);
+    const fileBuffer = fs.readFileSync(tmpFile);
 
     await client.send(new PutObjectCommand({
       Bucket:        VULTR_OS_BUCKET,
       Key:           storageKey,
-      Body:          fileStream,
+      Body:          fileBuffer,
       ContentType:   contentType,
-      ContentLength: stat.size,
-      ACL:           'public-read',
+      ContentLength: fileBuffer.length,
     }));
 
     const publicUrl = `${VULTR_OS_PUBLIC_BASE_URL.replace(/\/$/, '')}/${storageKey}`;

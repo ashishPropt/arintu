@@ -84,6 +84,7 @@ router.post('/', async (req, res) => {
     // Fire-and-forget (errors logged, not thrown)
     processRecording(data).catch((err) => {
       console.error('[Zoom webhook] Error processing recording:', err.message || err);
+      if (err.stack) console.error(err.stack);
     });
     return;
   }
