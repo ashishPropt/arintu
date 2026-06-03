@@ -7,6 +7,8 @@
  * Safe to re-run: uses ON CONFLICT DO NOTHING / checks before inserting.
  */
 
+require('dotenv').config({ path: require('path').join(__dirname, '../../.env') });
+
 const bcrypt  = require('bcryptjs');
 const db      = require('../../database/db');
 
