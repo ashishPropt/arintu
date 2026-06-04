@@ -1,138 +1,133 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
+import { useSiteContent } from '../../hooks/useSiteContent';
 
-const categories = ['All', 'Student Teachers', 'Students', 'Parents', 'Community'];
-
-const testimonials = [
-  // Student Teachers (Enfinitty Circle volunteers who mentor)
-  {
-    id: 1,
-    category: 'Student Teachers',
-    name: 'Arjun M.',
-    role: 'Enfinitty Circle — Student Volunteer',
-    location: 'San Diego, CA',
-    quote:
-      'Mentoring younger kids through the Circle completely changed my perspective on learning. When you have to explain a concept clearly enough for a 7th grader to understand it, you realize how much deeper your own understanding becomes.',
-    avatar: 'AM',
-    color: 'bg-purple-100 text-purple-700',
-  },
-  {
-    id: 2,
-    category: 'Student Teachers',
-    name: 'Priya K.',
-    role: 'Enfinitty Circle — Student Volunteer',
-    location: 'India cohort',
-    quote:
-      'Hosting a math workshop at a local elementary school was one of the most rewarding things I\'ve ever done. The kids\' excitement when they finally "got it" reminded me exactly why I love mathematics.',
-    avatar: 'PK',
-    color: 'bg-purple-100 text-purple-700',
-  },
-  {
-    id: 3,
-    category: 'Student Teachers',
-    name: 'Rohan S.',
-    role: 'Enfinitty Circle — Student Volunteer',
-    location: 'San Jose, CA',
-    quote:
-      'I was nervous about public speaking, but the Circle gave me a safe space to grow. After running three school events, I can now stand in front of a room of 60 kids with confidence.',
-    avatar: 'RS',
-    color: 'bg-purple-100 text-purple-700',
-  },
-
-  // Students
-  {
-    id: 4,
-    category: 'Students',
-    name: 'Maya T.',
-    role: 'Arintu student',
-    location: 'Los Angeles, CA',
-    quote:
-      'I applied to Arintu not knowing what to expect. A year later, I\'m admitted to UC Berkeley. The rigor, the teachers, and the community of peers pushed me far beyond what I thought I was capable of.',
-    avatar: 'MT',
-    color: 'bg-brand-100 text-brand-700',
-  },
-  {
-    id: 5,
-    category: 'Students',
-    name: 'Ethan L.',
-    role: 'Arintu student',
-    location: 'Vancouver, BC',
-    quote:
-      'The scholarship made Arintu accessible for me. What I got in return was so much more than world-class instruction — I found mentors and friends from five different countries who I\'m still in touch with today.',
-    avatar: 'EL',
-    color: 'bg-brand-100 text-brand-700',
-  },
-  {
-    id: 6,
-    category: 'Students',
-    name: 'Aisha N.',
-    role: 'Arintu student',
-    location: 'Lagos, Nigeria',
-    quote:
-      'Growing up, I assumed the best education was only for students in the US or UK. Arintu showed me that geography is no longer a barrier. I\'m competing with — and learning alongside — some of the brightest students in the world, right from my home.',
-    avatar: 'AN',
-    color: 'bg-brand-100 text-brand-700',
-  },
-
-  // Parents
-  {
-    id: 7,
-    category: 'Parents',
-    name: 'Sunita R.',
-    role: 'Parent of an Arintu student',
-    location: 'Hyderabad, India',
-    quote:
-      'What I appreciate most is how transparent the communication is. I always know what\'s being taught, when classes are happening, and how my daughter is progressing. I feel like a genuine partner in her education, not an afterthought.',
-    avatar: 'SR',
-    color: 'bg-emerald-100 text-emerald-700',
-  },
-  {
-    id: 8,
-    category: 'Parents',
-    name: 'James O.',
-    role: 'Parent of an Arintu student',
-    location: 'Austin, TX',
-    quote:
-      'My son was bored and disengaged in his regular school. After two months at Arintu, he was waking up early on class days. That transformation in attitude toward learning is priceless.',
-    avatar: 'JO',
-    color: 'bg-emerald-100 text-emerald-700',
-  },
-  {
-    id: 9,
-    category: 'Parents',
-    name: 'Lin W.',
-    role: 'Parent of an Arintu student',
-    location: 'Singapore',
-    quote:
-      'The teachers genuinely care. My daughter struggled at the start, and her teacher reached out to us before we even had a chance to ask for help. That level of attentiveness is rare.',
-    avatar: 'LW',
-    color: 'bg-emerald-100 text-emerald-700',
-  },
-
-  // Community Members
-  {
-    id: 10,
-    category: 'Community',
-    name: 'Dr. Patricia H.',
-    role: 'Elementary school principal',
-    location: 'San Diego, CA',
-    quote:
-      'The Enfinitty Circle volunteers who came to our school were remarkable young people — prepared, enthusiastic, and great with kids. Our 4th and 5th graders are still talking about the math challenges they ran. We\'ve already invited them back.',
-    avatar: 'PH',
-    color: 'bg-accent-100 text-accent-700',
-  },
-  {
-    id: 11,
-    category: 'Community',
-    name: 'Marcus J.',
-    role: 'Middle school teacher',
-    location: 'Chula Vista, CA',
-    quote:
-      'Having near-peer role models — high schoolers and college students who look like my students and come from similar backgrounds — has a motivational power that adult teachers simply can\'t replicate. The Circle volunteers understand this instinctively.',
-    avatar: 'MJ',
-    color: 'bg-accent-100 text-accent-700',
-  },
-];
+const DEFAULT_TESTIMONIALS = {
+  categories: ['All', 'Student Teachers', 'Students', 'Parents', 'Community'],
+  items: [
+    {
+      id: 1,
+      category: 'Student Teachers',
+      name: 'Arjun M.',
+      role: 'Enfinitty Circle — Student Volunteer',
+      location: 'San Diego, CA',
+      quote:
+        'Mentoring younger kids through the Circle completely changed my perspective on learning. When you have to explain a concept clearly enough for a 7th grader to understand it, you realize how much deeper your own understanding becomes.',
+      avatar: 'AM',
+      color: 'bg-purple-100 text-purple-700',
+    },
+    {
+      id: 2,
+      category: 'Student Teachers',
+      name: 'Priya K.',
+      role: 'Enfinitty Circle — Student Volunteer',
+      location: 'India cohort',
+      quote:
+        "Hosting a math workshop at a local elementary school was one of the most rewarding things I've ever done. The kids' excitement when they finally \"got it\" reminded me exactly why I love mathematics.",
+      avatar: 'PK',
+      color: 'bg-purple-100 text-purple-700',
+    },
+    {
+      id: 3,
+      category: 'Student Teachers',
+      name: 'Rohan S.',
+      role: 'Enfinitty Circle — Student Volunteer',
+      location: 'San Jose, CA',
+      quote:
+        'I was nervous about public speaking, but the Circle gave me a safe space to grow. After running three school events, I can now stand in front of a room of 60 kids with confidence.',
+      avatar: 'RS',
+      color: 'bg-purple-100 text-purple-700',
+    },
+    {
+      id: 4,
+      category: 'Students',
+      name: 'Maya T.',
+      role: 'Arintu student',
+      location: 'Los Angeles, CA',
+      quote:
+        "I applied to Arintu not knowing what to expect. A year later, I'm admitted to UC Berkeley. The rigor, the teachers, and the community of peers pushed me far beyond what I thought I was capable of.",
+      avatar: 'MT',
+      color: 'bg-brand-100 text-brand-700',
+    },
+    {
+      id: 5,
+      category: 'Students',
+      name: 'Ethan L.',
+      role: 'Arintu student',
+      location: 'Vancouver, BC',
+      quote:
+        "The scholarship made Arintu accessible for me. What I got in return was so much more than world-class instruction — I found mentors and friends from five different countries who I'm still in touch with today.",
+      avatar: 'EL',
+      color: 'bg-brand-100 text-brand-700',
+    },
+    {
+      id: 6,
+      category: 'Students',
+      name: 'Aisha N.',
+      role: 'Arintu student',
+      location: 'Lagos, Nigeria',
+      quote:
+        "Growing up, I assumed the best education was only for students in the US or UK. Arintu showed me that geography is no longer a barrier. I'm competing with — and learning alongside — some of the brightest students in the world, right from my home.",
+      avatar: 'AN',
+      color: 'bg-brand-100 text-brand-700',
+    },
+    {
+      id: 7,
+      category: 'Parents',
+      name: 'Sunita R.',
+      role: 'Parent of an Arintu student',
+      location: 'Hyderabad, India',
+      quote:
+        "What I appreciate most is how transparent the communication is. I always know what's being taught, when classes are happening, and how my daughter is progressing. I feel like a genuine partner in her education, not an afterthought.",
+      avatar: 'SR',
+      color: 'bg-emerald-100 text-emerald-700',
+    },
+    {
+      id: 8,
+      category: 'Parents',
+      name: 'James O.',
+      role: 'Parent of an Arintu student',
+      location: 'Austin, TX',
+      quote:
+        'My son was bored and disengaged in his regular school. After two months at Arintu, he was waking up early on class days. That transformation in attitude toward learning is priceless.',
+      avatar: 'JO',
+      color: 'bg-emerald-100 text-emerald-700',
+    },
+    {
+      id: 9,
+      category: 'Parents',
+      name: 'Lin W.',
+      role: 'Parent of an Arintu student',
+      location: 'Singapore',
+      quote:
+        'The teachers genuinely care. My daughter struggled at the start, and her teacher reached out to us before we even had a chance to ask for help. That level of attentiveness is rare.',
+      avatar: 'LW',
+      color: 'bg-emerald-100 text-emerald-700',
+    },
+    {
+      id: 10,
+      category: 'Community',
+      name: 'Dr. Patricia H.',
+      role: 'Elementary school principal',
+      location: 'San Diego, CA',
+      quote:
+        "The Enfinitty Circle volunteers who came to our school were remarkable young people — prepared, enthusiastic, and great with kids. Our 4th and 5th graders are still talking about the math challenges they ran. We've already invited them back.",
+      avatar: 'PH',
+      color: 'bg-accent-100 text-accent-700',
+    },
+    {
+      id: 11,
+      category: 'Community',
+      name: 'Marcus J.',
+      role: 'Middle school teacher',
+      location: 'Chula Vista, CA',
+      quote:
+        "Having near-peer role models — high schoolers and college students who look like my students and come from similar backgrounds — has a motivational power that adult teachers simply can't replicate. The Circle volunteers understand this instinctively.",
+      avatar: 'MJ',
+      color: 'bg-accent-100 text-accent-700',
+    },
+  ],
+};
 
 function Avatar({ initials, color }) {
   return (
@@ -143,11 +138,15 @@ function Avatar({ initials, color }) {
 }
 
 export default function Testimonials() {
+  const { data } = useSiteContent('testimonials', DEFAULT_TESTIMONIALS);
   const [activeCategory, setActiveCategory] = useState('All');
 
+  const categories = data.categories || DEFAULT_TESTIMONIALS.categories;
+  const items = data.items || [];
+
   const filtered = activeCategory === 'All'
-    ? testimonials
-    : testimonials.filter((t) => t.category === activeCategory);
+    ? items
+    : items.filter((t) => t.category === activeCategory);
 
   return (
     <div className="max-w-5xl mx-auto px-4 sm:px-6 py-14">
@@ -182,9 +181,9 @@ export default function Testimonials() {
 
       {/* Testimonials grid */}
       <div className="grid sm:grid-cols-2 gap-5 mb-14">
-        {filtered.map((t) => (
+        {filtered.map((t, idx) => (
           <div
-            key={t.id}
+            key={t.id || idx}
             className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 flex flex-col gap-4 relative overflow-hidden"
           >
             {/* Category badge */}

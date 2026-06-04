@@ -3,7 +3,9 @@
  * Used by the landing page.
  */
 const express = require('express');
-const db = require('../database/db');
+const path    = require('path');
+const fs      = require('fs');
+const db      = require('../database/db');
 
 const router = express.Router();
 
@@ -67,7 +69,12 @@ router.get('/classes', async (req, res) => {
           if (dp.rows[0]) {
             price = dp.rows[0].price;
             currencyCode = dp.rows[0].currency;
-            currencySymbol = country?.currency_symbol || '$';
+            // Look up the symbol for the default currency (don't use the selected country's symbol)
+            const symRes = await db.query(
+              'SELECT currency_symbol FROM countries WHERE currency_code = $1 LIMIT 1',
+              [dp.rows[0].currency]
+            );
+            currencySymbol = symRes.rows[0]?.currency_symbol || '$';
           }
         }
 
@@ -126,16 +133,92 @@ router.get('/application-fee', async (req, res) => {
   }
 });
 
-// GET /api/public/team — active team members, ordered by display_order
-router.get('/team', async (req, res) => {
+// GET /api/public/team/:id/photo — serve an uploaded team member photo
+router.get('/team/:id/photo', async (req, res) => {
   try {
     const result = await db.query(
-      `SELECT id, name, title, bio, photo_url, linkedin_url, display_order
+      'SELECT photo_uploaded_path FROM team_members WHERE id = $1',
+      [req.params.id]
+    );
+    const row = result.rows[0];
+    if (!row || !row.photo_uploaded_path) return res.status(404).end();
+    const absPath = path.resolve(row.photo_uploaded_path);
+    if (!fs.existsSync(absPath)) return res.status(404).end();
+    res.sendFile(absPath);
+  } catch (err) {
+    console.error(err);
+    res.status(500).end();
+  }
+});
+
+// GET /api/public/teacher/:id/photo — serve an uploaded teacher profile photo
+router.get('/teacher/:id/photo', async (req, res) => {
+  try {
+    const result = await db.query(
+      'SELECT profile_photo_path FROM users WHERE id = $1 AND role = \'teacher\'',
+      [req.params.id]
+    );
+    const row = result.rows[0];
+    if (!row || !row.profile_photo_path) return res.status(404).end();
+    const absPath = path.resolve(row.profile_photo_path);
+    if (!fs.existsSync(absPath)) return res.status(404).end();
+    res.sendFile(absPath);
+  } catch (err) {
+    console.error(err);
+    res.status(500).end();
+  }
+});
+
+// GET /api/public/team — active team members + teachers, ordered by display_order then name
+router.get('/team', async (req, res) => {
+  try {
+    // Staff / leadership team members
+    const teamRes = await db.query(
+      `SELECT id, name, title, bio, photo_url, linkedin_url, display_order,
+              photo_source, (photo_uploaded_path IS NOT NULL) AS has_uploaded_photo
        FROM team_members
        WHERE is_active = TRUE
        ORDER BY display_order ASC, created_at ASC`
     );
-    res.json(result.rows);
+
+    // Teachers who have opted into the team page (show_on_team = TRUE)
+    const teacherRes = await db.query(
+      `SELECT id, name, bio, linkedin_url, avatar_url,
+              (profile_photo_path IS NOT NULL) AS has_uploaded_photo
+       FROM users
+       WHERE role = 'teacher' AND is_active = TRUE AND show_on_team = TRUE
+       ORDER BY name ASC`
+    );
+
+    const teamRows = teamRes.rows.map((m) => ({
+      id:           m.id,
+      name:         m.name,
+      title:        m.title,
+      bio:          m.bio,
+      linkedin_url: m.linkedin_url,
+      display_order: m.display_order,
+      member_type:  'team',
+      photo_url:
+        m.photo_source === 'upload' && m.has_uploaded_photo
+          ? `/api/public/team/${m.id}/photo`
+          : (m.photo_url || null),
+    }));
+
+    const teacherRows = teacherRes.rows.map((t) => ({
+      id:           t.id,
+      name:         t.name,
+      title:        'Teacher',
+      bio:          t.bio,
+      linkedin_url: t.linkedin_url,
+      display_order: 999,
+      member_type:  'teacher',
+      photo_url:    t.has_uploaded_photo
+        ? `/api/public/teacher/${t.id}/photo`
+        : (t.avatar_url || null),
+    }));
+
+    // Staff first (by display_order), teachers after (by name)
+    res.json([...teamRows, ...teacherRows]);
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Server error' });
@@ -236,6 +319,74 @@ router.get('/student-countries', async (_req, res) => {
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// GET /api/public/content/:section — no auth required, used by public pages
+router.get('/content/:section', async (req, res) => {
+  try {
+    const result = await db.query(
+      'SELECT content FROM site_content WHERE section = $1',
+      [req.params.section]
+    );
+    res.json(result.rows[0]?.content || {});
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// GET /api/public/gallery — approved gallery items only
+router.get('/gallery', async (_req, res) => {
+  try {
+    const result = await db.query(
+      `SELECT id, title, description, file_type, mime_type, file_size,
+              uploader_name, created_at
+       FROM gallery_items
+       WHERE status = 'approved'
+       ORDER BY created_at DESC`
+    );
+    res.json(result.rows);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// GET /api/public/gallery/:id/file — serve an approved gallery file
+router.get('/gallery/:id/file', async (req, res) => {
+  try {
+    const result = await db.query(
+      "SELECT file_path, mime_type FROM gallery_items WHERE id = $1 AND status = 'approved'",
+      [req.params.id]
+    );
+    const row = result.rows[0];
+    if (!row) return res.status(404).end();
+    const abs = path.resolve(row.file_path);
+    if (!fs.existsSync(abs)) return res.status(404).end();
+
+    const stat = fs.statSync(abs);
+    const rangeHeader = req.headers.range;
+    if (rangeHeader && row.mime_type.startsWith('video/')) {
+      const parts    = rangeHeader.replace(/bytes=/, '').split('-');
+      const start    = parseInt(parts[0], 10);
+      const end      = parts[1] ? parseInt(parts[1], 10) : stat.size - 1;
+      const chunkSize = end - start + 1;
+      res.writeHead(206, {
+        'Content-Range':  `bytes ${start}-${end}/${stat.size}`,
+        'Accept-Ranges':  'bytes',
+        'Content-Length': chunkSize,
+        'Content-Type':   row.mime_type,
+      });
+      fs.createReadStream(abs, { start, end }).pipe(res);
+    } else {
+      res.setHeader('Content-Type', row.mime_type);
+      res.setHeader('Content-Length', stat.size);
+      fs.createReadStream(abs).pipe(res);
+    }
+  } catch (err) {
+    console.error(err);
+    res.status(500).end();
   }
 });
 

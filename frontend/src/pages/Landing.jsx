@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { publicApi, countries as countriesApi, applications } from '../api';
 import { useAuth } from '../contexts/AuthContext';
@@ -237,7 +237,7 @@ function AuthModal({ cls, onClose, onSuccess }) {
   const [tab, setTab] = useState('register'); // 'register' | 'login'
 
   return (
-    <Modal open title={`Apply to: ${cls.name}`} onClose={onClose} size="sm">
+    <Modal open title={`Apply to: ${cls.name}`} onClose={onClose} size="lg">
       {/* Tabs */}
       <div className="flex rounded-lg border border-gray-200 overflow-hidden mb-5">
         {[
@@ -264,20 +264,52 @@ function AuthModal({ cls, onClose, onSuccess }) {
   );
 }
 
+const CONTACT_PREFS = [
+  { value: 'email',    label: 'Email'    },
+  { value: 'phone',    label: 'Phone'    },
+  { value: 'whatsapp', label: 'WhatsApp' },
+  { value: 'any',      label: 'Any'      },
+];
+
 function RegisterForm({ onSuccess }) {
   const { register } = useAuth();
-  const [form, setForm] = useState({ name: '', email: '', password: '' });
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
+  const [form, setForm] = useState({
+    name: '', email: '', password: '',
+    parentName: '', parentEmail: '', parentPhone: '',
+    contactPreference: 'email',
+    countryId: '',
+  });
+  const [idFile,       setIdFile]       = useState(null);
+  const [regCountries, setRegCountries] = useState([]);
+  const [loading,      setLoading]      = useState(false);
+  const [error,        setError]        = useState('');
+  const [submitted,    setSubmitted]    = useState(false);
+  const fileRef = useRef(null);
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
+
+  useEffect(() => {
+    countriesApi.list().then((r) => setRegCountries(r.data || [])).catch(() => {});
+  }, []);
 
   const submit = async (e) => {
     e.preventDefault();
     setError('');
+    if (!form.parentName.trim()) return setError('Parent/guardian name is required.');
+    if (!form.parentEmail.trim()) return setError('Parent/guardian email is required.');
+    if (!idFile) return setError('Please upload a government-issued ID to continue.');
     setLoading(true);
     try {
-      await register(form.name, form.email, form.password);
-      onSuccess();
+      const fd = new FormData();
+      fd.append('role', 'student');
+      Object.entries(form).forEach(([k, v]) => { if (v) fd.append(k, v); });
+      fd.append('id_document', idFile);
+      const result = await register(fd);
+      if (result?.pending) {
+        // Account created but needs ID verification before they can log in
+        setSubmitted(true);
+        return;
+      }
+      onSuccess(); // signed in immediately (shouldn't happen with ID-required flow)
     } catch (err) {
       setError(err.response?.data?.error || 'Failed to create account');
     } finally {
@@ -285,47 +317,143 @@ function RegisterForm({ onSuccess }) {
     }
   };
 
+  // ── Post-registration pending screen ─────────────────────────────────────
+  if (submitted) {
+    return (
+      <div className="text-center py-4 space-y-4">
+        <div className="text-5xl">🎉</div>
+        <div>
+          <p className="font-semibold text-gray-900">Account created!</p>
+          <p className="text-sm text-gray-500 mt-1">
+            We're reviewing your ID — this usually takes up to 24 hours.
+            You'll receive an email once your account is approved.
+          </p>
+        </div>
+        <div className="bg-brand-50 border border-brand-100 rounded-lg p-3 text-xs text-brand-700 text-left">
+          <strong>What happens next?</strong><br />
+          Once approved, sign in from this page and click{' '}
+          <em>Apply Now</em> on any class you're interested in.
+        </div>
+      </div>
+    );
+  }
+
   return (
     <form onSubmit={submit} className="space-y-3">
       {error && <div className="p-3 bg-red-50 text-red-600 rounded-lg text-sm">{error}</div>}
+
+      {/* Name */}
       <div>
         <label className="block text-xs font-medium text-gray-700 mb-1">Full Name</label>
-        <input
-          className="input"
-          placeholder="Your name"
-          value={form.name}
-          onChange={(e) => set('name', e.target.value)}
-          required
-        />
+        <input className="input" placeholder="Your full name" value={form.name}
+          onChange={(e) => set('name', e.target.value)} required />
       </div>
+
+      {/* Email */}
       <div>
         <label className="block text-xs font-medium text-gray-700 mb-1">Email</label>
-        <input
-          type="email"
-          className="input"
-          placeholder="you@example.com"
-          value={form.email}
-          onChange={(e) => set('email', e.target.value)}
-          required
-        />
+        <input type="email" className="input" placeholder="you@example.com" value={form.email}
+          onChange={(e) => set('email', e.target.value)} required />
       </div>
+
+      {/* Password */}
       <div>
         <label className="block text-xs font-medium text-gray-700 mb-1">Password</label>
-        <input
-          type="password"
-          className="input"
-          placeholder="At least 6 characters"
-          value={form.password}
-          onChange={(e) => set('password', e.target.value)}
-          required
-          minLength={6}
-        />
+        <input type="password" className="input" placeholder="At least 6 characters" value={form.password}
+          onChange={(e) => set('password', e.target.value)} required minLength={6} />
       </div>
+
+      {/* Contact preference */}
+      <div>
+        <label className="block text-xs font-medium text-gray-700 mb-1">Preferred contact method</label>
+        <select className="input" value={form.contactPreference}
+          onChange={(e) => set('contactPreference', e.target.value)}>
+          {CONTACT_PREFS.map((p) => <option key={p.value} value={p.value}>{p.label}</option>)}
+        </select>
+      </div>
+
+      {/* Country */}
+      <div>
+        <label className="block text-xs font-medium text-gray-700 mb-1">Country</label>
+        <select className="input" value={form.countryId}
+          onChange={(e) => set('countryId', e.target.value)}>
+          <option value="">Select your country…</option>
+          {regCountries.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+        </select>
+      </div>
+
+      {/* Parent / Guardian */}
+      <div className="border border-blue-100 rounded-xl p-4 bg-blue-50 space-y-3">
+        <div>
+          <p className="text-xs font-semibold text-blue-800 mb-0.5">Parent / Guardian Information</p>
+          <p className="text-xs text-blue-600">Required for student accounts.</p>
+        </div>
+        <div>
+          <label className="block text-xs font-medium text-gray-700 mb-1">
+            Name <span className="text-red-500">*</span>
+          </label>
+          <input className="input" placeholder="Parent or guardian full name"
+            value={form.parentName} onChange={(e) => set('parentName', e.target.value)} />
+        </div>
+        <div>
+          <label className="block text-xs font-medium text-gray-700 mb-1">
+            Email <span className="text-red-500">*</span>
+          </label>
+          <input type="email" className="input" placeholder="parent@example.com"
+            value={form.parentEmail} onChange={(e) => set('parentEmail', e.target.value)} />
+        </div>
+        <div>
+          <label className="block text-xs font-medium text-gray-700 mb-1">
+            Phone <span className="text-xs text-gray-400">(optional)</span>
+          </label>
+          <input type="tel" className="input" placeholder="+1 555 000 0000"
+            value={form.parentPhone} onChange={(e) => set('parentPhone', e.target.value)} />
+        </div>
+      </div>
+
+      {/* ID Document upload */}
+      <div className="border border-amber-100 rounded-xl p-4 bg-amber-50 space-y-2">
+        <div>
+          <p className="text-xs font-semibold text-amber-800 mb-0.5">
+            🪪 Government-issued ID <span className="text-red-500">*</span>
+          </p>
+          <p className="text-xs text-amber-700 leading-snug">
+            Upload a photo or scan of your passport, national ID, or driving licence.
+            Your account will be verified within 24 hours.
+          </p>
+        </div>
+        <input
+          ref={fileRef}
+          type="file"
+          accept=".jpg,.jpeg,.png,.pdf"
+          className="hidden"
+          onChange={(e) => setIdFile(e.target.files?.[0] || null)}
+        />
+        {idFile ? (
+          <div className="flex items-center gap-2 p-2 bg-white border border-amber-200 rounded-lg">
+            <span className="text-base">📄</span>
+            <span className="text-xs text-gray-700 flex-1 truncate">{idFile.name}</span>
+            <span className="text-xs text-gray-400">{(idFile.size / 1024).toFixed(0)} KB</span>
+            <button type="button"
+              onClick={() => { setIdFile(null); fileRef.current.value = ''; }}
+              className="text-xs text-red-400 hover:text-red-600 ml-1">✕</button>
+          </div>
+        ) : (
+          <button
+            type="button"
+            onClick={() => fileRef.current.click()}
+            className="w-full py-2 px-3 border-2 border-dashed border-amber-200 rounded-lg text-xs text-amber-700 hover:bg-amber-100 transition-colors"
+          >
+            Click to choose file — JPG, PNG, or PDF, max 5 MB
+          </button>
+        )}
+      </div>
+
       <button type="submit" disabled={loading} className="btn-primary w-full mt-1">
         {loading ? 'Creating account…' : 'Create Account & Continue'}
       </button>
       <p className="text-xs text-gray-400 text-center">
-        You'll be able to review the application fee on the next screen.
+        You can submit your class application right away — your ID will be reviewed within 24 hours.
       </p>
     </form>
   );
@@ -406,7 +534,7 @@ function ClassCard({ cls, selectedCountry, user, onApply }) {
             {cls.price != null ? (
               <div>
                 <span className="text-xl font-bold text-brand-600">
-                  {selectedCountry?.currency_symbol || ''}{Number(cls.price).toLocaleString()}
+                  {cls.currency_symbol || selectedCountry?.currency_symbol || ''}{Number(cls.price).toLocaleString()}
                 </span>
                 <span className="text-xs text-gray-400 ml-1">{cls.currency_code}</span>
               </div>

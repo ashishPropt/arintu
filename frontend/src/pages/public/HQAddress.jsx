@@ -1,4 +1,19 @@
+import { useSiteContent } from '../../hooks/useSiteContent';
+
+const DEFAULT_HQ = {
+  address_lines: ['Arintu', '12268 Darkwood Road', 'San Diego, CA 92129', 'United States'],
+  email: 'infoenfinitty@gmail.com',
+  hours: 'Monday – Friday\n9:00 AM – 6:00 PM PT',
+  hours_note: 'Closed on major US holidays',
+  global_reach: 'Headquartered in the San Diego area, Arintu plans to serve learners from around the world.',
+};
+
 export default function HQAddress() {
+  const { data } = useSiteContent('hq', DEFAULT_HQ);
+
+  const addressLines = data.address_lines || DEFAULT_HQ.address_lines;
+  const hours = (data.hours || DEFAULT_HQ.hours).split('\n');
+
   return (
     <div className="max-w-3xl mx-auto px-4 sm:px-6 py-14">
       <h1 className="text-2xl font-bold text-gray-900 mb-2">Headquarters</h1>
@@ -14,10 +29,9 @@ export default function HQAddress() {
           </div>
           <h2 className="font-semibold text-gray-900 mb-1">Mailing Address</h2>
           <address className="not-italic text-sm text-gray-600 leading-relaxed">
-            Arintu<br />
-            12268 Darkwood Road<br />
-            San Diego, CA 92129<br />
-            United States
+            {addressLines.map((line, i) => (
+              <span key={i}>{line}{i < addressLines.length - 1 ? <br /> : null}</span>
+            ))}
           </address>
         </div>
 
@@ -32,8 +46,8 @@ export default function HQAddress() {
           <p className="text-sm text-gray-600 mb-3">
             Have a question or want to partner with us? We'd love to hear from you.
           </p>
-          <a href="mailto:infoenfinitty@gmail.com" className="text-sm font-medium text-brand-600 hover:underline">
-            infoenfinitty@gmail.com
+          <a href={`mailto:${data.email || DEFAULT_HQ.email}`} className="text-sm font-medium text-brand-600 hover:underline">
+            {data.email || DEFAULT_HQ.email}
           </a>
         </div>
 
@@ -46,10 +60,11 @@ export default function HQAddress() {
           </div>
           <h2 className="font-semibold text-gray-900 mb-1">Office Hours</h2>
           <p className="text-sm text-gray-600 leading-relaxed">
-            Monday – Friday<br />
-            9:00 AM – 6:00 PM PT
+            {hours.map((line, i) => (
+              <span key={i}>{line}{i < hours.length - 1 ? <br /> : null}</span>
+            ))}
           </p>
-          <p className="text-xs text-gray-400 mt-2">Closed on major US holidays</p>
+          <p className="text-xs text-gray-400 mt-2">{data.hours_note || DEFAULT_HQ.hours_note}</p>
         </div>
 
         {/* Region */}
@@ -61,7 +76,7 @@ export default function HQAddress() {
           </div>
           <h2 className="font-semibold text-gray-900 mb-1">Global Reach</h2>
           <p className="text-sm text-gray-600 leading-relaxed">
-            Headquartered in the San Diego area, Arintu plans to serve learners from around the world.
+            {data.global_reach || DEFAULT_HQ.global_reach}
           </p>
         </div>
       </div>

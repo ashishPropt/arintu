@@ -53,7 +53,9 @@ export default function PendingAccounts() {
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-xl font-bold text-gray-900">Pending Account Approvals</h1>
-          <p className="text-sm text-gray-500">Review and approve admin and teacher account requests</p>
+          <p className="text-sm text-gray-500">
+            Teacher and admin accounts whose identity has been verified and are awaiting your final activation.
+          </p>
         </div>
         <span className="text-sm font-medium text-gray-500 bg-gray-100 px-3 py-1 rounded-full">
           {pending.length} pending

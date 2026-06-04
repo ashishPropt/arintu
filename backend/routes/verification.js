@@ -109,7 +109,7 @@ router.get('/status', authenticate, async (req, res) => {
 router.get('/', authenticate, authorize('admin', 'superadmin'), async (req, res) => {
   const { status } = req.query;
   // Show all non-superadmin users who have uploaded an ID document
-  let where = ["u.role NOT IN ('admin', 'superadmin')", 'u.id_document_path IS NOT NULL'];
+  let where = ["u.role != 'superadmin'", 'u.id_document_path IS NOT NULL'];
   let params = [];
   let idx = 1;
 
@@ -161,35 +161,72 @@ router.get('/:userId/id-proof', authenticate, authorize('admin', 'superadmin'), 
 });
 
 // ── PUT /api/verification/:userId/approve  (admin/superadmin) ─────────────────
+// Students/parents: ID verified → account activated immediately.
+// Teachers/admins:  ID verified → verification_status = 'approved' but account stays
+//                   'pending' until superadmin gives final approval in Pending Accounts.
 router.put('/:userId/approve', authenticate, authorize('admin', 'superadmin'), async (req, res) => {
   try {
-    const result = await db.query(
-      `UPDATE users SET
-         verification_status      = 'approved',
-         verification_notes       = NULL,
-         verification_reviewed_by = $1,
-         verification_reviewed_at = NOW(),
-         account_status           = 'active',
-         is_active                = TRUE,
-         updated_at               = NOW()
-       WHERE id = $2 AND role NOT IN ('admin', 'superadmin')
-       RETURNING id, name, email, role, verification_status, account_status`,
-      [req.user.id, req.params.userId]
+    // Fetch role first — superadmins cannot be acted on
+    const check = await db.query(
+      "SELECT id, name, email, role FROM users WHERE id = $1 AND role != 'superadmin'",
+      [req.params.userId]
     );
-    if (!result.rows[0]) return res.status(404).json({ error: 'User not found' });
+    if (!check.rows[0]) return res.status(404).json({ error: 'User not found' });
+    const usr = check.rows[0];
 
-    const usr = result.rows[0];
+    const isStaff = ['teacher', 'admin'].includes(usr.role);
 
-    await createNotification({
-      userId: usr.id,
-      title: 'ID Verification approved — account active',
-      message: 'Your identity has been verified and your account is now active. Welcome to Arintu!',
-      type: 'info',
-    });
+    let result;
+    if (isStaff) {
+      // Mark ID as verified but do NOT activate — superadmin must approve separately
+      result = await db.query(
+        `UPDATE users SET
+           verification_status      = 'approved',
+           verification_notes       = NULL,
+           verification_reviewed_by = $1,
+           verification_reviewed_at = NOW(),
+           updated_at               = NOW()
+         WHERE id = $2
+         RETURNING id, name, email, role, verification_status, account_status`,
+        [req.user.id, usr.id]
+      );
+    } else {
+      // Students / parents: verify ID and activate account in one step
+      result = await db.query(
+        `UPDATE users SET
+           verification_status      = 'approved',
+           verification_notes       = NULL,
+           verification_reviewed_by = $1,
+           verification_reviewed_at = NOW(),
+           account_status           = 'active',
+           is_active                = TRUE,
+           updated_at               = NOW()
+         WHERE id = $2
+         RETURNING id, name, email, role, verification_status, account_status`,
+        [req.user.id, usr.id]
+      );
+    }
 
-    emailSvc.sendVerificationApproved(usr.email, usr.name).catch(() => {});
+    const updated = result.rows[0];
 
-    res.json(usr);
+    if (isStaff) {
+      await createNotification({
+        userId: updated.id,
+        title: 'ID Verified — awaiting final approval',
+        message: 'Your identity document has been verified. Your account is now queued for final approval by the super admin. You will be notified once your account is activated.',
+        type: 'info',
+      });
+    } else {
+      await createNotification({
+        userId: updated.id,
+        title: 'ID Verification approved — account active',
+        message: 'Your identity has been verified and your account is now active. Welcome to Arintu!',
+        type: 'info',
+      });
+      emailSvc.sendVerificationApproved(updated.email, updated.name).catch(() => {});
+    }
+
+    res.json(updated);
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Server error' });
@@ -207,7 +244,7 @@ router.put('/:userId/reject', authenticate, authorize('admin', 'superadmin'), as
          verification_reviewed_by = $2,
          verification_reviewed_at = NOW(),
          updated_at = NOW()
-       WHERE id = $3 AND role NOT IN ('admin', 'superadmin')
+       WHERE id = $3 AND role != 'superadmin'
        RETURNING id, name, email, role, verification_status`,
       [notes || null, req.user.id, req.params.userId]
     );

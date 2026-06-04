@@ -17,6 +17,7 @@ const communityLinks = [
   { to: '/community/arintu-online',      label: 'Arintu Online' },
   { to: '/community/enfinitty-circle',   label: 'Enfinitty Circle' },
   { to: '/community/testimonials',       label: 'Testimonials' },
+  { to: '/community/gallery',            label: '📷 Gallery' },
 ];
 
 function NavDropdown({ label, links, onNavigate }) {

@@ -68,7 +68,10 @@ export default function StudentVerification() {
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-xl font-bold text-gray-900">ID Verification</h1>
-          <p className="text-sm text-gray-500">Review and verify identity documents for all new accounts</p>
+          <p className="text-sm text-gray-500">
+            Review identity documents for all new accounts. Approving a student or parent activates
+            their account. Approving a teacher or admin queues them for final superadmin activation.
+          </p>
         </div>
       </div>
 

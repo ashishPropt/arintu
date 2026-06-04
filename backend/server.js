@@ -47,6 +47,7 @@ app.use('/api/verification',  require('./routes/verification'));
 app.use('/api/worksheets',    require('./routes/worksheets'));
 app.use('/api/family',        require('./routes/family'));
 app.use('/api/recordings',    require('./routes/recordings'));
+app.use('/api/gallery',       require('./routes/gallery'));
 
 app.get('/api/health', (req, res) => res.json({ status: 'ok', version: '1.0.0' }));
 

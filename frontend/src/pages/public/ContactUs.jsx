@@ -1,17 +1,29 @@
 import { useState } from 'react';
+import { useSiteContent } from '../../hooks/useSiteContent';
+
+const DEFAULT_CONTACT = {
+  email: 'infoenfinitty@gmail.com',
+  address_lines: ['12268 Darkwood Road', 'San Diego, CA 92129', 'United States'],
+  response_time:
+    'We aim to respond to all enquiries within one business day (Monday–Friday, 9 AM–6 PM PT).',
+};
 
 export default function ContactUs() {
+  const { data } = useSiteContent('contact', DEFAULT_CONTACT);
   const [form, setForm] = useState({ name: '', email: '', subject: '', message: '' });
   const [sent, setSent] = useState(false);
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
 
-  // Opens the user's mail client with the form values pre-filled
+  const contactEmail = data.email || DEFAULT_CONTACT.email;
+  const addressLines = data.address_lines || DEFAULT_CONTACT.address_lines;
+  const responseTime = data.response_time || DEFAULT_CONTACT.response_time;
+
   const handleSubmit = (e) => {
     e.preventDefault();
     const body = encodeURIComponent(
       `Name: ${form.name}\nEmail: ${form.email}\n\n${form.message}`
     );
-    window.location.href = `mailto:infoenfinitty@gmail.com?subject=${encodeURIComponent(form.subject || 'Arintu Enquiry')}&body=${body}`;
+    window.location.href = `mailto:${contactEmail}?subject=${encodeURIComponent(form.subject || 'Arintu Enquiry')}&body=${body}`;
     setSent(true);
   };
 
@@ -30,7 +42,7 @@ export default function ContactUs() {
             <div className="p-5 bg-green-50 border border-green-100 rounded-2xl text-center">
               <div className="text-3xl mb-2">📧</div>
               <p className="font-semibold text-green-800">Your mail client should open now.</p>
-              <p className="text-sm text-green-700 mt-1">If it didn't, email us directly at infoenfinitty@gmail.com</p>
+              <p className="text-sm text-green-700 mt-1">If it didn't, email us directly at {contactEmail}</p>
               <button onClick={() => setSent(false)} className="mt-3 text-xs text-green-600 underline hover:no-underline">
                 Send another message
               </button>
@@ -97,18 +109,20 @@ export default function ContactUs() {
           <ContactCard
             icon="📧"
             label="Email"
-            value="infoenfinitty@gmail.com"
-            href="mailto:infoenfinitty@gmail.com"
+            value={contactEmail}
+            href={`mailto:${contactEmail}`}
           />
           <ContactCard
             icon="📍"
             label="Headquarters"
-            value={<>12268 Darkwood Road<br />San Diego, CA 92129<br />United States</>}
+            value={addressLines.map((line, i) => (
+              <span key={i}>{line}{i < addressLines.length - 1 ? <br /> : null}</span>
+            ))}
           />
           <ContactCard
             icon="🕐"
             label="Response time"
-            value="We aim to respond to all enquiries within one business day (Monday–Friday, 9 AM–6 PM PT)."
+            value={responseTime}
           />
 
           <div className="mt-6 p-5 bg-brand-50 border border-brand-100 rounded-2xl">

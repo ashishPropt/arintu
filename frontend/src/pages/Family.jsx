@@ -193,7 +193,7 @@ function ApplicationsTab({ apps, paying, onPayAppFee, onPayClassFee }) {
                 </span>
               </div>
               <p className="text-xs text-gray-400 mt-1">
-                Applied {format(new Date(a.created_at), 'MMM d, yyyy')}
+                Applied {format(new Date(a.applied_at), 'MMM d, yyyy')}
               </p>
             </div>
             <div className="shrink-0 flex flex-col gap-1.5">

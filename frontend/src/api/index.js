@@ -147,6 +147,18 @@ export const worksheets = {
   download: (id) => api.get(`/worksheets/${id}/download`, { responseType: 'blob' }),
 };
 
+export const gallery = {
+  // Public upload (no auth)
+  upload: (formData) => api.post('/gallery/upload', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  }),
+  // Admin moderation (auth required)
+  list:   (params) => api.get('/gallery', { params }),
+  review: (id, action, admin_notes) => api.put(`/gallery/${id}/review`, { action, admin_notes }),
+  remove: (id) => api.delete(`/gallery/${id}`),
+  fileUrl: (id) => `/api/gallery/${id}/file`,          // admin preview
+};
+
 export const publicApi = {
   classes: (countryCode) => api.get('/public/classes', { params: { countryCode } }),
   applicationFee: (countryCode) => api.get('/public/application-fee', { params: { countryCode } }),
@@ -155,14 +167,40 @@ export const publicApi = {
   countries: () => api.get('/public/countries'),
   books: () => api.get('/public/books'),
   studentCountries: () => api.get('/public/student-countries'),
+  siteContent: (section) => api.get(`/public/content/${section}`),
+  galleryItems: () => api.get('/public/gallery'),
+  galleryFileUrl: (id) => `/api/public/gallery/${id}/file`,
+};
+
+export const teacherProfile = {
+  // For teachers editing own profile, or admin/superadmin editing any teacher
+  get:         (id)       => api.get(`/content/teacher/${id}`),
+  update:      (id, data) => api.put(`/content/teacher/${id}`, data),
+  uploadPhoto: (id, file) => {
+    const fd = new FormData();
+    fd.append('photo', file);
+    return api.post(`/content/teacher/${id}/photo`, fd, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+  },
+  // List all teachers (admin/superadmin)
+  list: () => api.get('/content/teachers'),
 };
 
 export const content = {
+  // Site content CMS (superadmin)
+  getSiteContent: (section) => api.get(`/content/site/${section}`),
+  updateSiteContent: (section, contentData) => api.put(`/content/site/${section}`, { content: contentData }),
   // Team (superadmin)
   getTeam: () => api.get('/content/team'),
   createTeamMember: (data) => api.post('/content/team', data),
   updateTeamMember: (id, data) => api.put(`/content/team/${id}`, data),
   deleteTeamMember: (id) => api.delete(`/content/team/${id}`),
+  uploadTeamPhoto: (id, file) => {
+    const fd = new FormData();
+    fd.append('photo', file);
+    return api.post(`/content/team/${id}/photo`, fd);
+  },
   // Cities (superadmin)
   getCities: () => api.get('/content/cities'),
   createCity: (data) => api.post('/content/cities', data),

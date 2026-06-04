@@ -624,6 +624,9 @@ function AdminClassModal({ classId, onClose, onChanged, teachers, students, coun
   const [removingStudent, setRemovingStudent] = useState(null); // student_id being removed
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [deleting,      setDeleting]      = useState(false);
+  const [editMaxStudents,  setEditMaxStudents]  = useState(false);
+  const [maxStudentsVal,   setMaxStudentsVal]   = useState('');
+  const [savingMaxStudents, setSavingMaxStudents] = useState(false);
 
   useEffect(() => {
     classesApi.get(classId).then((r) => setData(r.data)).catch(() => {});
@@ -677,10 +680,61 @@ function AdminClassModal({ classId, onClose, onChanged, teachers, students, coun
 
       {tab === 'info' && (
         <div className="space-y-3 text-sm">
-          <Row label="Subject"      value={data.subject      || '—'} />
-          <Row label="Level"        value={data.level        || '—'} />
-          <Row label="Max Students" value={data.max_students} />
-          <Row label="Enrolled"     value={data.enrolled_count} />
+          <Row label="Subject"  value={data.subject || '—'} />
+          <Row label="Level"    value={data.level   || '—'} />
+          {/* Max Students — editable by admins */}
+          <div className="py-1 border-b border-gray-50 flex items-center justify-between gap-2">
+            <span className="text-gray-500 text-xs shrink-0">Max Students</span>
+            {isAdmin && editMaxStudents ? (
+              <div className="flex items-center gap-1">
+                <input
+                  type="number"
+                  min="1"
+                  autoFocus
+                  className="input w-20 text-sm py-0.5 px-2"
+                  value={maxStudentsVal}
+                  onChange={(e) => setMaxStudentsVal(e.target.value)}
+                />
+                <button
+                  disabled={savingMaxStudents}
+                  onClick={async () => {
+                    const val = parseInt(maxStudentsVal);
+                    if (!val || val < 1) return;
+                    setSavingMaxStudents(true);
+                    try {
+                      await classesApi.update(classId, { max_students: val });
+                      const res = await classesApi.get(classId);
+                      setData(res.data);
+                      onChanged();
+                      setEditMaxStudents(false);
+                    } catch {} finally { setSavingMaxStudents(false); }
+                  }}
+                  className="text-xs px-2 py-0.5 bg-brand-600 text-white rounded hover:bg-brand-700 disabled:opacity-50"
+                >
+                  {savingMaxStudents ? '…' : 'Save'}
+                </button>
+                <button
+                  onClick={() => setEditMaxStudents(false)}
+                  className="text-xs px-2 py-0.5 border border-gray-200 rounded hover:bg-gray-50"
+                >
+                  Cancel
+                </button>
+              </div>
+            ) : (
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-medium text-gray-900">{data.max_students}</span>
+                {isAdmin && (
+                  <button
+                    onClick={() => { setMaxStudentsVal(String(data.max_students)); setEditMaxStudents(true); }}
+                    className="text-xs text-brand-500 hover:text-brand-700 hover:underline"
+                  >
+                    Edit
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
+          <Row label="Enrolled" value={data.enrolled_count} />
           <Row label="Admin"        value={data.admin_name} />
           {(data.prerequisites || []).length > 0 && (
             <div className="py-1 border-b border-gray-50">

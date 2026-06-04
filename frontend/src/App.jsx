@@ -15,8 +15,10 @@ import Countries from './pages/superadmin/Countries';
 import Scholarships from './pages/superadmin/Scholarships';
 import ManageTeam from './pages/superadmin/ManageTeam';
 import PendingAccounts from './pages/superadmin/PendingAccounts';
-import Applications from './pages/admin/Applications';
+import SiteContent from './pages/superadmin/SiteContent';
+import MediaModeration from './pages/superadmin/MediaModeration';
 import StudentVerification from './pages/admin/StudentVerification';
+import Applications from './pages/admin/Applications';
 import ForgotPassword from './pages/ForgotPassword';
 import ResetPassword from './pages/ResetPassword';
 import Register from './pages/Register';
@@ -42,6 +44,7 @@ import Privacy from './pages/public/Privacy';
 import PaymentSuccess from './pages/public/PaymentSuccess';
 import PaymentCancel from './pages/public/PaymentCancel';
 import Testimonials from './pages/public/Testimonials';
+import Gallery from './pages/public/Gallery';
 
 function RequireAuth({ children, roles }) {
   const { user, loading } = useAuth();
@@ -90,6 +93,7 @@ export default function App() {
             <Route path="/community/arintu-online"    element={<ArintuOnline />} />
             <Route path="/community/enfinitty-circle" element={<EnfinittyCircle />} />
             <Route path="/community/testimonials"     element={<Testimonials />} />
+            <Route path="/community/gallery"          element={<Gallery />} />
             <Route path="/contact"         element={<ContactUs />} />
             <Route path="/terms"           element={<Terms />} />
             <Route path="/privacy"         element={<Privacy />} />
@@ -114,6 +118,11 @@ export default function App() {
                 <StudentVerification />
               </RequireAuth>
             } />
+            <Route path="applications" element={
+              <RequireAuth roles={['superadmin', 'admin']}>
+                <Applications />
+              </RequireAuth>
+            } />
             <Route path="pending-accounts" element={
               <RequireAuth roles={['superadmin']}>
                 <PendingAccounts />
@@ -134,11 +143,6 @@ export default function App() {
                 <Countries />
               </RequireAuth>
             } />
-            <Route path="applications" element={
-              <RequireAuth roles={['superadmin', 'admin']}>
-                <Applications />
-              </RequireAuth>
-            } />
             <Route path="scholarships" element={
               <RequireAuth roles={['superadmin']}>
                 <Scholarships />
@@ -147,6 +151,16 @@ export default function App() {
             <Route path="manage-team" element={
               <RequireAuth roles={['superadmin']}>
                 <ManageTeam />
+              </RequireAuth>
+            } />
+            <Route path="site-content" element={
+              <RequireAuth roles={['superadmin']}>
+                <SiteContent />
+              </RequireAuth>
+            } />
+            <Route path="media-moderation" element={
+              <RequireAuth roles={['superadmin', 'admin']}>
+                <MediaModeration />
               </RequireAuth>
             } />
             <Route path="family" element={

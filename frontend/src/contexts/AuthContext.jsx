@@ -30,10 +30,20 @@ export function AuthProvider({ children }) {
     return res.data.user;
   };
 
-  const register = async (name, email, password) => {
-    const res = await authApi.register({ name, email, password });
+  const register = async (nameOrFormData, email, password) => {
+    // Accept either a FormData object (full registration with ID upload)
+    // or plain (name, email, password) strings for simple registration.
+    const payload = nameOrFormData instanceof FormData
+      ? nameOrFormData
+      : { name: nameOrFormData, email, password };
+    const res = await authApi.register(payload);
+    // Full registration (with ID upload) returns { pending: true } — no token.
+    // Simple registration (without ID, internal use) may return a token directly.
+    if (res.data.pending) {
+      return { pending: true };
+    }
     localStorage.setItem('arintu_token', res.data.token);
-    await loadUser(); // fetch full user from /me so field names are consistent (snake_case)
+    await loadUser();
     return res.data.user;
   };
 

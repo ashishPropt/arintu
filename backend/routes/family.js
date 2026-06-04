@@ -75,7 +75,7 @@ router.get('/children/:childId/classes', authenticate, async (req, res) => {
     if (!child.rows[0]) return res.status(404).json({ error: 'Child not found or not linked to your account' });
 
     const result = await db.query(
-      `SELECT e.id, e.enrolled_at, e.status,
+      `SELECT e.id, e.enrolled_at,
               c.id AS class_id, c.name AS class_name, c.subject, c.description, c.is_active
        FROM enrollments e
        JOIN classes c ON c.id = e.class_id
@@ -138,7 +138,7 @@ router.get('/children/:childId/applications', authenticate, async (req, res) => 
        FROM class_applications ca
        JOIN classes cl ON cl.id = ca.class_id
        WHERE ca.student_id = $1
-       ORDER BY ca.created_at DESC`,
+       ORDER BY ca.applied_at DESC`,
       [req.params.childId]
     );
     res.json(result.rows);

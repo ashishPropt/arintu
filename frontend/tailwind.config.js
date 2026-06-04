@@ -5,16 +5,16 @@ export default {
     extend: {
       colors: {
         brand: {
-          50: '#f0f4ff',
-          100: '#dce7ff',
-          200: '#b9cfff',
-          300: '#8aadff',
-          400: '#5680ff',
-          500: '#3355ff',
-          600: '#1a32f5',
-          700: '#1525e1',
-          800: '#1720b6',
-          900: '#1a2390',
+          50:  '#edfff6',
+          100: '#d3f5e7',
+          200: '#a9ebd1',
+          300: '#6dd9b3',
+          400: '#3dc898',
+          500: '#1DB87D',
+          600: '#17a36d',
+          700: '#138d5d',
+          800: '#0f754e',
+          900: '#0c5f3f',
         },
         accent: {
           50: '#fdf4ff',
@@ -31,6 +31,7 @@ export default {
       },
       fontFamily: {
         sans: ['Inter', 'system-ui', 'sans-serif'],
+        logo: ['Nunito', 'Inter', 'system-ui', 'sans-serif'],
       },
     },
   },

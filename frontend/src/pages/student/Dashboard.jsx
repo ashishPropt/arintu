@@ -1,8 +1,9 @@
 import { useState, useEffect, useRef } from 'react';
-import { classes, schedules, verification as verificationApi, auth as authApi, publicApi } from '../../api';
+import { classes, schedules, verification as verificationApi, auth as authApi, publicApi, applications as appsApi } from '../../api';
 import { useAuth } from '../../contexts/AuthContext';
 import { Link } from 'react-router-dom';
 import { format } from 'date-fns';
+import Modal from '../../components/Modal';
 
 export default function StudentDashboard() {
   const { user, reload: reloadUser } = useAuth();
@@ -37,6 +38,9 @@ export default function StudentDashboard() {
 
       {/* Country Card */}
       <CountryCard user={user} onSaved={reloadUser} />
+
+      {/* Pending Payments & Scholarship */}
+      <PendingPayments />
 
       <div className="grid md:grid-cols-2 gap-4 mb-4">
         <div className="card p-4 flex items-center gap-3">
@@ -90,6 +94,217 @@ export default function StudentDashboard() {
     </div>
   );
 }
+
+// ─── Pending Payments & Scholarship ─────────────────────────────────────────
+
+function PendingPayments() {
+  const [apps, setApps] = useState([]);
+  const [scholarshipTarget, setScholarshipTarget] = useState(null); // app object
+  const [paying, setPaying] = useState(null); // appId being processed
+
+  const load = () => {
+    appsApi.list({}).then((r) => {
+      const all = r.data || [];
+      // Only show apps needing action (exclude fully enrolled / not_required / rejected)
+      const actionable = all.filter((a) =>
+        a.payment_status === 'pending_payment' ||
+        ['pending_payment', 'scholarship_pending'].includes(a.class_fee_status)
+      );
+      setApps(actionable);
+    }).catch(() => {});
+  };
+
+  useEffect(() => { load(); }, []);
+
+  const handlePayClassFee = async (appId) => {
+    setPaying(appId);
+    try {
+      const r = await appsApi.payClassFee(appId);
+      if (r.data.checkoutUrl) window.location.href = r.data.checkoutUrl;
+    } catch (err) {
+      alert(err.response?.data?.error || 'Could not start payment. Please try again.');
+    } finally { setPaying(null); }
+  };
+
+  const handlePayAppFee = async (appId) => {
+    setPaying(appId);
+    try {
+      const r = await appsApi.retryAppFee(appId);
+      if (r.data.checkoutUrl) window.location.href = r.data.checkoutUrl;
+    } catch (err) {
+      alert(err.response?.data?.error || 'Could not start payment. Please try again.');
+    } finally { setPaying(null); }
+  };
+
+  if (apps.length === 0) return null;
+
+  return (
+    <div className="mb-6">
+      <h2 className="text-sm font-semibold text-gray-700 mb-3">Action Required</h2>
+      <div className="space-y-3">
+        {apps.map((a) => {
+          const isBusy = paying === a.id;
+
+          /* ── Application fee still unpaid ── */
+          if (a.payment_status === 'pending_payment' && a.class_fee_status !== 'scholarship_pending') {
+            return (
+              <div key={a.id} className="card p-4 border-l-4 border-amber-400">
+                <p className="text-xs text-amber-600 font-semibold uppercase tracking-wide mb-1">Application Fee Pending</p>
+                <p className="text-sm font-semibold text-gray-900 mb-3">{a.class_name}</p>
+                <button
+                  onClick={() => handlePayAppFee(a.id)}
+                  disabled={isBusy}
+                  className="w-full py-2.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-white font-semibold text-sm transition-colors disabled:opacity-60"
+                >
+                  {isBusy ? 'Processing…' : `Pay Application Fee${a.currency_symbol && a.application_fee_charged ? ` · ${a.currency_symbol}${Number(a.application_fee_charged).toLocaleString()}` : ''}`}
+                </button>
+              </div>
+            );
+          }
+
+          /* ── Scholarship waiting for review ── */
+          if (a.class_fee_status === 'scholarship_pending') {
+            return (
+              <div key={a.id} className="card p-4 border-l-4 border-violet-400">
+                <div className="flex items-start gap-3">
+                  <span className="text-2xl">⏳</span>
+                  <div>
+                    <p className="text-sm font-semibold text-gray-900">{a.class_name}</p>
+                    <p className="text-xs text-violet-700 font-medium mt-0.5">
+                      Scholarship application under review — payment is locked until a decision is made.
+                    </p>
+                    <p className="text-xs text-gray-400 mt-1">You will be notified once the admin has reviewed your request.</p>
+                  </div>
+                </div>
+              </div>
+            );
+          }
+
+          /* ── Class fee ready to pay (may have discount from partial scholarship) ── */
+          if (a.class_fee_status === 'pending_payment') {
+            const hasDiscount = a.scholarship_discount_pct > 0;
+            return (
+              <div key={a.id} className="card p-5 border-2 border-violet-200 bg-gradient-to-br from-violet-50 to-white">
+                <div className="flex items-center justify-between mb-1">
+                  <p className="text-xs text-violet-600 font-semibold uppercase tracking-wide">Class Fee Due</p>
+                  {hasDiscount && (
+                    <span className="px-2 py-0.5 bg-green-100 text-green-700 text-xs font-bold rounded-full">
+                      🎉 {a.scholarship_discount_pct}% scholarship applied!
+                    </span>
+                  )}
+                </div>
+                <p className="text-base font-bold text-gray-900 mb-1">{a.class_name}</p>
+                {a.class_fee_amount && (
+                  <p className="text-2xl font-extrabold text-violet-700 mb-4">
+                    {a.currency_symbol}{Number(a.class_fee_amount).toLocaleString()}
+                    {hasDiscount && <span className="text-sm font-normal text-gray-400 ml-2">after scholarship</span>}
+                  </p>
+                )}
+
+                {/* PRIMARY: Scholarship button (large, unmissable) */}
+                {!hasDiscount && (
+                  <button
+                    onClick={() => setScholarshipTarget(a)}
+                    className="w-full py-3.5 mb-3 rounded-2xl font-bold text-base text-white shadow-lg transition-all active:scale-95
+                      bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-700 hover:to-purple-700
+                      flex items-center justify-center gap-2"
+                  >
+                    <span className="text-xl">🎓</span>
+                    Apply for Scholarship
+                    <span className="ml-1 px-2 py-0.5 bg-white/20 rounded-full text-xs font-semibold">May reduce or waive your fee</span>
+                  </button>
+                )}
+
+                {/* SECONDARY: Pay full / discounted fee */}
+                <button
+                  onClick={() => handlePayClassFee(a.id)}
+                  disabled={isBusy}
+                  className={`w-full py-2.5 rounded-xl font-semibold text-sm transition-colors disabled:opacity-60 ${
+                    hasDiscount
+                      ? 'bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-700 hover:to-purple-700 text-white shadow-md'
+                      : 'bg-white border-2 border-gray-200 text-gray-700 hover:bg-gray-50'
+                  }`}
+                >
+                  {isBusy ? 'Processing…' : hasDiscount ? '💳 Pay Discounted Fee' : 'Pay Full Fee Instead'}
+                </button>
+              </div>
+            );
+          }
+
+          return null;
+        })}
+      </div>
+
+      {scholarshipTarget && (
+        <ScholarshipModal
+          app={scholarshipTarget}
+          onClose={() => setScholarshipTarget(null)}
+          onRequested={() => { setScholarshipTarget(null); load(); }}
+        />
+      )}
+    </div>
+  );
+}
+
+function ScholarshipModal({ app, onClose, onRequested }) {
+  const [reason, setReason] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  const submit = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    setError('');
+    try {
+      await appsApi.requestScholarship(app.id, reason);
+      onRequested();
+    } catch (err) {
+      setError(err.response?.data?.error || 'Failed to submit. Please try again.');
+    } finally { setLoading(false); }
+  };
+
+  return (
+    <Modal open title="Apply for Scholarship" onClose={onClose} size="sm">
+      <form onSubmit={submit} className="space-y-4">
+        <div className="rounded-xl bg-violet-50 border border-violet-100 p-4">
+          <p className="text-sm font-semibold text-violet-900">🎓 {app.class_name}</p>
+          <p className="text-xs text-violet-700 mt-1">
+            Scholarship applications are reviewed by the admin. While your application is under review,
+            your payment will be <strong>locked</strong> until a decision is made.
+          </p>
+        </div>
+
+        {error && <div className="p-3 bg-red-50 text-red-600 rounded-lg text-sm">{error}</div>}
+
+        <div>
+          <label className="block text-xs font-medium text-gray-700 mb-1">
+            Why are you applying for a scholarship? <span className="text-gray-400">(optional)</span>
+          </label>
+          <textarea
+            className="input"
+            rows={4}
+            value={reason}
+            onChange={(e) => setReason(e.target.value)}
+            placeholder="Briefly describe your situation — financial need, academic merit, or any other reason…"
+          />
+        </div>
+
+        <div className="flex gap-2 justify-end">
+          <button type="button" onClick={onClose} className="btn-secondary">Cancel</button>
+          <button
+            type="submit"
+            disabled={loading}
+            className="px-5 py-2 rounded-xl bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-700 hover:to-purple-700 text-white font-semibold text-sm disabled:opacity-60"
+          >
+            {loading ? 'Submitting…' : 'Submit Scholarship Request'}
+          </button>
+        </div>
+      </form>
+    </Modal>
+  );
+}
+
+// ─── Country Card ─────────────────────────────────────────────────────────────
 
 function CountryCard({ user, onSaved }) {
   const [editing,   setEditing]   = useState(false);

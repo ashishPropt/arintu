@@ -103,9 +103,11 @@ router.post(
 router.get('/pending-approval', authenticate, authorize('superadmin'), async (req, res) => {
   try {
     const result = await db.query(
-      `SELECT id, email, name, role, account_status, created_at
+      `SELECT id, email, name, role, account_status, verification_status, created_at
        FROM users
-       WHERE account_status = 'pending' AND role IN ('admin', 'teacher')
+       WHERE account_status = 'pending'
+         AND role IN ('admin', 'teacher')
+         AND verification_status = 'approved'
        ORDER BY created_at ASC`
     );
     res.json(result.rows);

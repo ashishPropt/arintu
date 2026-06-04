@@ -65,7 +65,11 @@ export default function PendingVerification() {
     navigate('/login', { replace: true });
   };
 
-  const isRejected = verStatus === 'rejected';
+  const isRejected  = verStatus === 'rejected';
+  const isIdVerified = verStatus === 'approved';
+  const isStaff = user?.role === 'teacher' || user?.role === 'admin';
+  // Teachers/admins: ID approved but still awaiting superadmin final approval
+  const awaitingFinalApproval = isIdVerified && isStaff;
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-brand-50 via-white to-accent-50 p-4">
@@ -86,8 +90,29 @@ export default function PendingVerification() {
 
         <div className="card p-6 shadow-sm space-y-5">
 
-          {/* ── Pending state ────────────────────────────────────────────────── */}
-          {!isRejected && (
+          {/* ── ID verified, awaiting superadmin final approval (teacher/admin) ── */}
+          {awaitingFinalApproval && (
+            <div className="text-center py-2">
+              <div className="text-5xl mb-4">✅</div>
+              <h2 className="text-base font-semibold text-gray-900 mb-2">
+                Identity Verified
+              </h2>
+              <p className="text-sm text-gray-500 mb-4">
+                Your ID has been verified. Your account is now awaiting
+                final approval from our super admin — this usually
+                takes up to 24 hours. You'll receive an email once your account is activated.
+              </p>
+              <div className="bg-brand-50 border border-brand-100 rounded-lg p-3 text-xs text-brand-700 text-left">
+                <strong>What happens next?</strong><br />
+                A super admin will review and activate your{' '}
+                <span className="capitalize">{user?.role}</span> account.
+                Once approved you can sign in and access the platform.
+              </div>
+            </div>
+          )}
+
+          {/* ── Pending state — ID still under review ────────────────────────── */}
+          {!isRejected && !awaitingFinalApproval && (
             <div className="text-center py-2">
               <div className="text-5xl mb-4">⏳</div>
               <h2 className="text-base font-semibold text-gray-900 mb-2">

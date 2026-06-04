@@ -217,7 +217,7 @@ export default function Schedules() {
         <CreateScheduleModal
           classes={myClasses}
           onClose={() => setShowCreate(false)}
-          onCreated={() => { setShowCreate(false); load(); }}
+          onCreated={() => { setShowCreate(false); load(); loadUpcoming(); }}
           onBulkZoom={bulkZoom}
         />
       )}
@@ -234,6 +234,15 @@ export default function Schedules() {
 }
 
 function ScheduleCard({ schedule: s, isAdmin, canCreateZoom, onCreateZoom, onDeleted }) {
+  const [confirmDel, setConfirmDel] = useState(false);
+  const [deleting,   setDeleting]   = useState(false);
+
+  const doDelete = async () => {
+    setDeleting(true);
+    try { await schedulesApi.remove(s.id); onDeleted(); }
+    catch {} finally { setDeleting(false); setConfirmDel(false); }
+  };
+
   return (
     <div className="bg-brand-50 border border-brand-100 rounded-lg p-2 text-xs group">
       <div className="flex items-start justify-between gap-1">
@@ -263,11 +272,33 @@ function ScheduleCard({ schedule: s, isAdmin, canCreateZoom, onCreateZoom, onDel
             + Zoom
           </button>
         ) : null}
-        {isAdmin && (
-          <button onClick={async () => { await schedulesApi.remove(s.id); onDeleted(); }}
-            className="px-1.5 py-0.5 bg-white border border-gray-200 text-gray-400 rounded opacity-0 group-hover:opacity-100 hover:bg-red-50 hover:text-red-500">
+        {isAdmin && !confirmDel && (
+          <button
+            onClick={() => setConfirmDel(true)}
+            className="px-1.5 py-0.5 bg-white border border-gray-200 text-gray-400 rounded opacity-0 group-hover:opacity-100 hover:bg-red-50 hover:text-red-500"
+          >
             ✕
           </button>
+        )}
+        {isAdmin && confirmDel && (
+          <div className="w-full mt-1 p-1.5 bg-red-50 border border-red-100 rounded space-y-1">
+            <p className="text-red-700 font-medium">Delete this session?</p>
+            <div className="flex gap-1">
+              <button
+                disabled={deleting}
+                onClick={doDelete}
+                className="px-2 py-0.5 bg-red-500 text-white rounded hover:bg-red-600 disabled:opacity-50"
+              >
+                {deleting ? '…' : 'Yes'}
+              </button>
+              <button
+                onClick={() => setConfirmDel(false)}
+                className="px-2 py-0.5 bg-white border border-gray-200 text-gray-600 rounded hover:bg-gray-50"
+              >
+                No
+              </button>
+            </div>
+          </div>
         )}
       </div>
     </div>
