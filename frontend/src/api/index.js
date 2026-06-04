@@ -170,6 +170,7 @@ export const publicApi = {
   siteContent: (section) => api.get(`/public/content/${section}`),
   galleryItems: () => api.get('/public/gallery'),
   galleryFileUrl: (id) => `/api/public/gallery/${id}/file`,
+  jobs: () => api.get('/public/jobs'),
 };
 
 export const teacherProfile = {
@@ -239,6 +240,13 @@ export const mathwave = {
 export const recordings = {
   list: () => api.get('/recordings'),
   byClass: (classId) => api.get(`/recordings/class/${classId}`),
+};
+
+export const jobs = {
+  list:   ()         => api.get('/jobs'),
+  create: (data)     => api.post('/jobs', data),
+  update: (id, data) => api.put(`/jobs/${id}`, data),
+  remove: (id)       => api.delete(`/jobs/${id}`),
 };
 
 export default api;
