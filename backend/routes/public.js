@@ -390,6 +390,22 @@ router.get('/gallery/:id/file', async (req, res) => {
   }
 });
 
+// GET /api/public/jobs — active job postings (empty array = "hiring soon" shown by frontend)
+router.get('/jobs', async (_req, res) => {
+  try {
+    const result = await db.query(
+      `SELECT id, title, department, location, type, description, requirements, display_order, created_at
+       FROM jobs
+       WHERE is_active = TRUE
+       ORDER BY display_order ASC, created_at DESC`
+    );
+    res.json(result.rows);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
 // GET /api/public/books — approved book submissions only
 router.get('/books', async (req, res) => {
   try {

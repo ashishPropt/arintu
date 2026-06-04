@@ -17,6 +17,7 @@ import ManageTeam from './pages/superadmin/ManageTeam';
 import PendingAccounts from './pages/superadmin/PendingAccounts';
 import SiteContent from './pages/superadmin/SiteContent';
 import MediaModeration from './pages/superadmin/MediaModeration';
+import ManageJobs from './pages/superadmin/ManageJobs';
 import StudentVerification from './pages/admin/StudentVerification';
 import Applications from './pages/admin/Applications';
 import ForgotPassword from './pages/ForgotPassword';
@@ -161,6 +162,11 @@ export default function App() {
             <Route path="media-moderation" element={
               <RequireAuth roles={['superadmin', 'admin']}>
                 <MediaModeration />
+              </RequireAuth>
+            } />
+            <Route path="manage-jobs" element={
+              <RequireAuth roles={['superadmin']}>
+                <ManageJobs />
               </RequireAuth>
             } />
             <Route path="family" element={
