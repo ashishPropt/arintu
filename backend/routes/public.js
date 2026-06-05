@@ -23,7 +23,7 @@ router.get('/classes', async (req, res) => {
     }
 
     const classes = await db.query(
-      `SELECT c.id, c.name, c.description, c.subject, c.level, c.max_students, c.is_active,
+      `SELECT c.id, c.name, c.code, c.description, c.subject, c.level, c.max_students, c.is_active,
               u.name as admin_name,
               (SELECT COUNT(*) FROM enrollments e WHERE e.class_id = c.id) as enrolled_count,
               (SELECT json_agg(json_build_object('name', t.name))
@@ -32,7 +32,7 @@ router.get('/classes', async (req, res) => {
        FROM classes c
        JOIN users u ON u.id = c.admin_id
        WHERE c.is_active = TRUE
-       ORDER BY c.created_at DESC`
+       ORDER BY c.code ASC NULLS LAST, c.created_at DESC`
     );
 
     // For each class, find the best price for the requested country
