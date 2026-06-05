@@ -520,6 +520,9 @@ function LoginForm({ onSuccess }) {
 
 function ClassCard({ cls, selectedCountry, user, onApply }) {
   const teacher = cls.teachers?.[0];
+  const [descExpanded, setDescExpanded] = useState(false);
+  const CHAR_LIMIT = 120;
+  const longDesc = cls.description && cls.description.length > CHAR_LIMIT;
 
   return (
     <div className="bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition-shadow overflow-hidden flex flex-col">
@@ -551,7 +554,21 @@ function ClassCard({ cls, selectedCountry, user, onApply }) {
           </p>
         )}
         {cls.description && (
-          <p className="text-xs text-gray-500 line-clamp-2 mb-3">{cls.description}</p>
+          <div className="mb-3">
+            <p className="text-xs text-gray-500 leading-relaxed">
+              {descExpanded || !longDesc
+                ? cls.description
+                : cls.description.slice(0, CHAR_LIMIT).trimEnd() + '…'}
+            </p>
+            {longDesc && (
+              <button
+                onClick={() => setDescExpanded((v) => !v)}
+                className="text-xs text-brand-600 hover:underline mt-0.5 font-medium"
+              >
+                {descExpanded ? 'See less' : 'See more'}
+              </button>
+            )}
+          </div>
         )}
 
         <div className="mt-auto space-y-2">
