@@ -52,9 +52,9 @@ export default function PendingAccounts() {
     <div>
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-xl font-bold text-gray-900">Pending Account Approvals</h1>
+          <h1 className="text-xl font-bold text-gray-900">Teacher / Admin Approvals</h1>
           <p className="text-sm text-gray-500">
-            Teacher and admin accounts whose identity has been verified and are awaiting your final activation.
+            Teacher and admin accounts that signed up via the frontend and are awaiting your approval before they can access the platform.
           </p>
         </div>
         <span className="text-sm font-medium text-gray-500 bg-gray-100 px-3 py-1 rounded-full">
