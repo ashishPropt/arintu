@@ -33,7 +33,7 @@ const DEFAULT_FAQ = {
     },
     {
       q: 'How are teachers vetted?',
-      a: 'All Arintu teachers go through a rigorous review process that includes credential verification, a teaching demonstration, and reference checks. We prioritise educators with a track record of engaging, inclusive teaching.',
+      a: 'All Arintu teachers go through a rigorous review process that includes credential verification, a teaching demonstration, and reference checks. We prioritize educators with a track record of engaging, inclusive teaching.',
     },
     {
       q: 'What is Enfinitty Circle?',

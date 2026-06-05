@@ -32,7 +32,7 @@ const DEFAULTS = {
       { q: 'Are classes live or recorded?', a: 'Our classes are primarily live, conducted over Zoom at scheduled times. Recorded sessions are made available to enrolled students for review. We believe live interaction between students and teachers is essential to the Arintu learning experience.' },
       { q: 'What languages are classes taught in?', a: 'The majority of our classes are taught in English. We periodically offer classes in Hindi and other languages — check the class description for language details.' },
       { q: "Can I drop a class once I've enrolled?", a: 'Please contact your class teacher or reach out to us at infoenfinitty@gmail.com. Refund and withdrawal policies depend on the class and how far along the course has progressed.' },
-      { q: 'How are teachers vetted?', a: 'All Arintu teachers go through a rigorous review process that includes credential verification, a teaching demonstration, and reference checks. We prioritise educators with a track record of engaging, inclusive teaching.' },
+      { q: 'How are teachers vetted?', a: 'All Arintu teachers go through a rigorous review process that includes credential verification, a teaching demonstration, and reference checks. We prioritize educators with a track record of engaging, inclusive teaching.' },
       { q: 'What is Enfinitty Circle?', a: 'Enfinitty Circle is our exclusive community for high-achieving Arintu learners. Members get access to mentorship sessions, networking events, guest speaker series, and an alumni network spanning dozens of countries.' },
       { q: 'How do I get in touch with support?', a: "Email us at infoenfinitty@gmail.com or reach out through the dashboard's notification system. We aim to respond to all queries within one business day." },
     ],
@@ -80,7 +80,7 @@ const DEFAULTS = {
     features: [
       { icon: '🎥', title: 'Live Classes via Zoom', desc: 'All Arintu sessions run live, so you learn in real time alongside classmates from around the world. Every class is capped to keep the teacher-student ratio high.' },
       { icon: '📼', title: 'Session Recordings', desc: 'Miss a session or want to review? Enrolled students have access to recordings for the duration of their course. Learn at your own pace without falling behind.' },
-      { icon: '🤖', title: 'AI Learning Assistant', desc: 'Our AI assistant analyses your practice patterns and suggests targeted exercises. It flags topics you should revisit before the next session and celebrates your wins.' },
+      { icon: '🤖', title: 'AI Learning Assistant', desc: 'Our AI assistant analyzes your practice patterns and suggests targeted exercises. It flags topics you should revisit before the next session and celebrates your wins.' },
       { icon: '📊', title: 'Progress Dashboard', desc: 'Track attendance, assignment completion, and performance trends in a clear, visual dashboard. Teachers and students see the same data, making support conversations more effective.' },
       { icon: '🗓️', title: 'Smart Scheduling', desc: "Our scheduling system considers timezones, public holidays, and teacher availability to find slots that work for every student. You'll never miss a class due to a scheduling conflict." },
       { icon: '💬', title: 'Async Q&A', desc: 'Got a question between sessions? Post it in the class channel. Teachers and TAs respond within 24 hours. High-quality answers are pinned for the whole cohort to see.' },

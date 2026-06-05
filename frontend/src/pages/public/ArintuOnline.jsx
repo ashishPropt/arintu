@@ -20,7 +20,7 @@ const DEFAULT_ARINTU_ONLINE = {
     {
       icon: '🤖',
       title: 'AI Learning Assistant',
-      desc: 'Our AI assistant analyses your practice patterns and suggests targeted exercises. It flags topics you should revisit before the next session and celebrates your wins.',
+      desc: 'Our AI assistant analyzes your practice patterns and suggests targeted exercises. It flags topics you should revisit before the next session and celebrates your wins.',
     },
     {
       icon: '📊',
