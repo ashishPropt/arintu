@@ -530,9 +530,6 @@ function ClassCard({ cls, selectedCountry, user, onApply }) {
 
       <div className="p-5 flex flex-col flex-1">
         <div className="flex items-start justify-between mb-3">
-          <div className="w-10 h-10 rounded-xl bg-brand-50 text-brand-600 font-bold text-base flex items-center justify-center shrink-0">
-            {cls.name[0]}
-          </div>
           <div className="text-right">
             {cls.price != null ? (
               <div>
