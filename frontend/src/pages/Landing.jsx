@@ -547,6 +547,11 @@ function ClassCard({ cls, selectedCountry, user, onApply }) {
           </div>
         </div>
 
+        {cls.code && (
+          <span className="inline-block text-xs font-bold tracking-wide text-brand-600 bg-brand-50 px-2 py-0.5 rounded-md mb-1">
+            {cls.code}
+          </span>
+        )}
         <h3 className="font-semibold text-gray-900 text-base mb-1">{cls.name}</h3>
         {cls.subject && (
           <p className="text-xs text-gray-500 mb-1">
