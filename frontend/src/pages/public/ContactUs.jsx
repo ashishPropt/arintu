@@ -5,7 +5,7 @@ const DEFAULT_CONTACT = {
   email: 'infoenfinitty@gmail.com',
   address_lines: ['12268 Darkwood Road', 'San Diego, CA 92129', 'United States'],
   response_time:
-    'We aim to respond to all enquiries within one business day (Monday–Friday, 9 AM–6 PM PT).',
+    'We aim to respond to all inquiries within one business day (Monday–Friday, 9 AM–6 PM PT).',
 };
 
 export default function ContactUs() {
@@ -23,7 +23,7 @@ export default function ContactUs() {
     const body = encodeURIComponent(
       `Name: ${form.name}\nEmail: ${form.email}\n\n${form.message}`
     );
-    window.location.href = `mailto:${contactEmail}?subject=${encodeURIComponent(form.subject || 'Arintu Enquiry')}&body=${body}`;
+    window.location.href = `mailto:${contactEmail}?subject=${encodeURIComponent(form.subject || 'Arintu Inquiry')}&body=${body}`;
     setSent(true);
   };
 
@@ -31,7 +31,7 @@ export default function ContactUs() {
     <div className="max-w-4xl mx-auto px-4 sm:px-6 py-14">
       <h1 className="text-2xl font-bold text-gray-900 mb-2">Contact Us</h1>
       <p className="text-gray-500 mb-10">
-        We'd love to hear from you — whether it's a question about enrolment, a partnership idea, or just a hello.
+        We'd love to hear from you — whether it's a question about enrollment, a partnership idea, or just a hello.
       </p>
 
       <div className="grid sm:grid-cols-2 gap-8">
@@ -76,7 +76,7 @@ export default function ContactUs() {
                 <label className="block text-xs font-medium text-gray-700 mb-1">Subject</label>
                 <input
                   className="input"
-                  placeholder="e.g. Class enrolment question"
+                  placeholder="e.g. Class enrollment question"
                   value={form.subject}
                   onChange={(e) => set('subject', e.target.value)}
                 />

@@ -19,7 +19,7 @@ const DEFAULT_HISTORY = {
       year: '2020',
       title: 'Going Fully Online',
       description:
-        'When the global pandemic forced classrooms to close, Arintu pivoted fast. The entire programme moved online within two weeks. What was initially a constraint became a strength — suddenly learners anywhere in the world could attend. Enrolment tripled.',
+        'When the global pandemic forced classrooms to close, Arintu pivoted fast. The entire program moved online within two weeks. What was initially a constraint became a strength — suddenly learners anywhere in the world could attend. Enrollment tripled.',
     },
     {
       year: '2021',
@@ -29,9 +29,9 @@ const DEFAULT_HISTORY = {
     },
     {
       year: '2022',
-      title: 'Scholarship Programme Launch',
+      title: 'Scholarship Program Launch',
       description:
-        'Formalising what had been an informal arrangement, Arintu launched a structured scholarship programme. Every class now reserves 20% of its seats for scholarship recipients — full or partial — chosen by the super admin.',
+        'Formalising what had been an informal arrangement, Arintu launched a structured scholarship program. Every class now reserves 20% of its seats for scholarship recipients — full or partial — chosen by the super admin.',
     },
     {
       year: '2023',

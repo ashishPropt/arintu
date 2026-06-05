@@ -360,7 +360,7 @@ function StudentClassModal({ classId, onClose }) {
             <div className="font-semibold mb-1">
               {hasDiscount
                 ? `Partial scholarship applied — pay remaining amount`
-                : 'Class fee payment required to complete enrolment'}
+                : 'Class fee payment required to complete enrollment'}
             </div>
             {hasDiscount && (
               <p className="text-xs mb-1">
@@ -584,7 +584,7 @@ function ScholarshipRequestModal({ appId, className, onClose, onBack, onSubmitte
 
         <div className="p-3 bg-purple-50 border border-purple-100 rounded-xl text-xs text-purple-700">
           <strong>How it works:</strong> Describe why you need financial assistance. The admin will review
-          your request and may award a full scholarship (free enrolment) or a partial discount. You will
+          your request and may award a full scholarship (free enrollment) or a partial discount. You will
           be notified by the outcome.
         </div>
 

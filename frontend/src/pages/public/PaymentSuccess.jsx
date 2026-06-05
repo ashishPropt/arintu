@@ -94,7 +94,7 @@ export default function PaymentSuccess() {
               <span className="font-medium text-green-700">✓ Paid</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-gray-500">Enrolment status</span>
+              <span className="text-gray-500">Enrollment status</span>
               <span className="font-medium text-green-700">✓ Enrolled</span>
             </div>
           </div>
@@ -115,7 +115,7 @@ export default function PaymentSuccess() {
           <h1 className="text-2xl font-bold text-gray-900 mb-2">Application fee confirmed!</h1>
           <p className="text-gray-600 mb-6 leading-relaxed">
             Your one-time application fee has been received. The next step is to pay the class fee
-            for <strong>{className}</strong> to complete your enrolment.
+            for <strong>{className}</strong> to complete your enrollment.
           </p>
 
           <div className="bg-blue-50 border border-blue-100 rounded-2xl p-5 mb-6 text-sm text-left space-y-2">
@@ -132,7 +132,7 @@ export default function PaymentSuccess() {
               <span className="font-medium text-amber-700">⟳ Payment required</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-gray-500">Enrolment status</span>
+              <span className="text-gray-500">Enrollment status</span>
               <span className="font-medium text-amber-700">Pending class fee</span>
             </div>
           </div>

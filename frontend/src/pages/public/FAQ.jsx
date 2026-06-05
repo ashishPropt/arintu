@@ -8,15 +8,15 @@ const DEFAULT_FAQ = {
       a: 'Our classes are designed for motivated learners of all ages who want to go beyond what their local school or institution offers. We serve students from primary school through to working professionals looking to upskill.',
     },
     {
-      q: 'How do I enrol in a class?',
-      a: 'Browse our class catalogue on the home page. Click "Apply Now" on any class you\'re interested in. You\'ll need to create a free account (or sign in) and submit an application. Applications are reviewed and you\'ll be notified of the outcome within a few days.',
+      q: 'How do I enroll in a class?',
+      a: 'Browse our class catalog on the home page. Click "Apply Now" on any class you\'re interested in. You\'ll need to create a free account (or sign in) and submit an application. Applications are reviewed and you\'ll be notified of the outcome within a few days.',
     },
     {
       q: 'Is there an application fee?',
       a: "Yes, there is a one-time application fee that varies by country. The fee is charged on your first class application and is waived for all subsequent classes. If you're unable to pay the fee, you can request a waiver from your dashboard — a super admin will review your request.",
     },
     {
-      q: 'What is the scholarship programme?',
+      q: 'What is the scholarship program?',
       a: 'Every class reserves up to 20% of its seats for scholarship recipients. Scholarships can be full (class fee fully covered) or partial (a percentage discount). You can request a scholarship when you apply for a class. The super admin makes all scholarship decisions.',
     },
     {

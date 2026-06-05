@@ -5,7 +5,7 @@ const DEFAULT_ARINTU_ONLINE = {
   hero_badge: '🌐 All classes. One platform.',
   hero_title: 'Arintu Online',
   hero_subtitle:
-    "Every Arintu class runs on our integrated online platform — purpose-built for deep learning, not just content delivery. Here's what you get when you enrol.",
+    "Every Arintu class runs on our integrated online platform — purpose-built for deep learning, not just content delivery. Here's what you get when you enroll.",
   features: [
     {
       icon: '🎥',
@@ -46,7 +46,7 @@ const DEFAULT_ARINTU_ONLINE = {
   how_it_works: [
     { step: '01', label: 'Browse classes', desc: 'Find the right class for your level and schedule.' },
     { step: '02', label: 'Apply', desc: 'Create an account and submit your application in minutes.' },
-    { step: '03', label: 'Get approved', desc: 'An admin reviews your application and enrols you.' },
+    { step: '03', label: 'Get approved', desc: 'An admin reviews your application and enrolls you.' },
     { step: '04', label: 'Start learning', desc: 'Join your first live session and never look back.' },
   ],
 };

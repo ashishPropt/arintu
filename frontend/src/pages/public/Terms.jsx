@@ -34,7 +34,7 @@ export default function Terms() {
 
       <Section title="2. Accounts">
         <p>
-          To apply for or enrol in a class, you must create an account. You agree to provide accurate, current, and complete information and to keep your account credentials confidential. You are responsible for all activity that occurs under your account.
+          To apply for or enroll in a class, you must create an account. You agree to provide accurate, current, and complete information and to keep your account credentials confidential. You are responsible for all activity that occurs under your account.
         </p>
         <p>
           Students must be at least 13 years of age to create an account independently. Learners under 13 must have a parent or guardian create and manage the account on their behalf.
@@ -44,15 +44,15 @@ export default function Terms() {
         </p>
       </Section>
 
-      <Section title="3. Enrolment and Applications">
+      <Section title="3. Enrollment and Applications">
         <p>
-          Submitting an application does not guarantee enrolment. All applications are reviewed by an Arintu administrator, and enrolment is confirmed only upon approval and completion of any applicable payment.
+          Submitting an application does not guarantee enrollment. All applications are reviewed by an Arintu administrator, and enrollment is confirmed only upon approval and completion of any applicable payment.
         </p>
         <p>
-          A one-time application fee may apply depending on your country of residence. This fee is charged on your first approved application and is waived for all subsequent classes in which you enrol. The application fee is non-refundable unless Arintu is unable to enrol you.
+          A one-time application fee may apply depending on your country of residence. This fee is charged on your first approved application and is waived for all subsequent classes in which you enroll. The application fee is non-refundable unless Arintu is unable to enroll you.
         </p>
         <p>
-          Class fees are charged separately upon enrolment confirmation and are subject to the pricing applicable to your country at the time of application.
+          Class fees are charged separately upon enrollment confirmation and are subject to the pricing applicable to your country at the time of application.
         </p>
       </Section>
 
@@ -70,7 +70,7 @@ export default function Terms() {
           Arintu classes are conducted primarily via live video conferencing (Zoom or equivalent). Session recordings may be made available to enrolled students for the duration of their course for review purposes only.
         </p>
         <p>
-          You agree to attend classes punctually, treat teachers and fellow students with respect, and adhere to any conduct guidelines communicated by your teacher. Arintu reserves the right to remove a student from a class for repeated disruptive behaviour without refund.
+          You agree to attend classes punctually, treat teachers and fellow students with respect, and adhere to any conduct guidelines communicated by your teacher. Arintu reserves the right to remove a student from a class for repeated disruptive behavior without refund.
         </p>
         <p>
           Class schedules are subject to change. We will provide reasonable advance notice of any material changes to scheduled sessions.

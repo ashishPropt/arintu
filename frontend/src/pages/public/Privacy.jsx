@@ -25,20 +25,20 @@ export default function Privacy() {
 
       <Section title="1. Who We Are">
         <p>
-          {COMPANY} ("Arintu," "we," "us," or "our") operates the Arintu online education platform. Our registered address is 12268 Darkwood Road, San Diego, CA 92129, United States. For privacy enquiries, contact us at <a href={`mailto:${EMAIL}`} className="text-brand-600 hover:underline">{EMAIL}</a>.
+          {COMPANY} ("Arintu," "we," "us," or "our") operates the Arintu online education platform. Our registered address is 12268 Darkwood Road, San Diego, CA 92129, United States. For privacy inquiries, contact us at <a href={`mailto:${EMAIL}`} className="text-brand-600 hover:underline">{EMAIL}</a>.
         </p>
       </Section>
 
       <Section title="2. Information We Collect">
         <p><strong>Account information.</strong> When you register, we collect your name, email address, and a hashed password. If you are a teacher or administrator, we may also collect professional information such as your qualifications.</p>
 
-        <p><strong>Application and enrolment data.</strong> When you apply to a class, we collect information about the class selected, your country of residence (for pricing), scholarship or fee waiver requests, and any notes submitted as part of the process.</p>
+        <p><strong>Application and enrollment data.</strong> When you apply to a class, we collect information about the class selected, your country of residence (for pricing), scholarship or fee waiver requests, and any notes submitted as part of the process.</p>
 
         <p><strong>Payment information.</strong> We do not store full payment card details on our servers. Payment processing is handled by third-party providers, and we retain only the metadata necessary for record-keeping (e.g. amount paid, date, transaction reference).</p>
 
         <p><strong>Usage data.</strong> We collect standard server logs including IP addresses, browser type, pages visited, and timestamps. This is used for platform security, debugging, and aggregate analytics.</p>
 
-        <p><strong>Communications.</strong> If you contact us by email or through the Platform, we retain that correspondence to help resolve your enquiry.</p>
+        <p><strong>Communications.</strong> If you contact us by email or through the Platform, we retain that correspondence to help resolve your inquiry.</p>
 
         <p><strong>Community contributions.</strong> If you submit a book suggestion via the Book Club, the submitted content (title, Amazon URL, reason) and your name are stored and may be displayed publicly if approved.</p>
       </Section>
@@ -46,7 +46,7 @@ export default function Privacy() {
       <Section title="3. How We Use Your Information">
         <ul className="list-disc pl-5 space-y-1">
           <li>To create and manage your account</li>
-          <li>To process class applications and manage enrolments</li>
+          <li>To process class applications and manage enrollments</li>
           <li>To determine applicable pricing and application fees based on your country</li>
           <li>To review scholarship and fee waiver requests</li>
           <li>To send transactional notifications (application decisions, schedule changes, Zoom links)</li>
@@ -55,7 +55,7 @@ export default function Privacy() {
           <li>To comply with legal obligations</li>
         </ul>
         <p>
-          We do not use your data for behavioural advertising. We do not sell, rent, or trade your personal information to third parties.
+          We do not use your data for behavioral advertising. We do not sell, rent, or trade your personal information to third parties.
         </p>
       </Section>
 
@@ -80,7 +80,7 @@ export default function Privacy() {
       <Section title="6. Sharing Your Information">
         <p>We share your information only in the following circumstances:</p>
         <ul className="list-disc pl-5 space-y-1">
-          <li><strong>Teachers and administrators:</strong> Your name and class enrolment details are shared with the teachers and administrators of classes you are enrolled in.</li>
+          <li><strong>Teachers and administrators:</strong> Your name and class enrollment details are shared with the teachers and administrators of classes you are enrolled in.</li>
           <li><strong>Video conferencing:</strong> We use Zoom to deliver live classes. When you join a session, Zoom's own privacy policy governs that interaction.</li>
           <li><strong>Service providers:</strong> We work with trusted third-party providers for hosting, email delivery, and payment processing. These providers are contractually bound to protect your data and use it only as directed by us.</li>
           <li><strong>Legal requirements:</strong> We may disclose information if required to do so by law, court order, or governmental authority.</li>
@@ -101,7 +101,7 @@ export default function Privacy() {
           We retain your account data for as long as your account is active. If you request deletion of your account, we will delete or anonymise your personal data within 30 days, except where we are required to retain it by law (e.g. financial records, which we keep for 7 years).
         </p>
         <p>
-          Application and enrolment records may be retained in anonymised form for educational programme reporting and analytics after your account is deleted.
+          Application and enrollment records may be retained in anonymised form for educational program reporting and analytics after your account is deleted.
         </p>
       </Section>
 

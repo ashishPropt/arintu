@@ -9,9 +9,9 @@ const DEFAULTS = {
     milestones: [
       { year: '2018', title: 'The Beginning', description: 'Arintu was founded in San Ramon, California by Shiv Kayal and a small group of educators who believed that geography should never be a barrier to a world-class education. The first cohort of 12 students joined from three countries.' },
       { year: '2019', title: 'First 100 Students', description: 'Word spread quickly. By the end of 2019, Arintu had enrolled over 100 students across India, Nepal, and the United States. The team grew to include five dedicated teachers and an operations coordinator.' },
-      { year: '2020', title: 'Going Fully Online', description: 'When the global pandemic forced classrooms to close, Arintu pivoted fast. The entire programme moved online within two weeks. What was initially a constraint became a strength — suddenly learners anywhere in the world could attend. Enrolment tripled.' },
+      { year: '2020', title: 'Going Fully Online', description: 'When the global pandemic forced classrooms to close, Arintu pivoted fast. The entire program moved online within two weeks. What was initially a constraint became a strength — suddenly learners anywhere in the world could attend. Enrollment tripled.' },
       { year: '2021', title: '10+ Countries', description: 'Arintu expanded its footprint to over ten countries. Country-specific pricing was introduced to ensure that quality learning remained accessible regardless of economic background. A dedicated scholarship fund was established.' },
-      { year: '2022', title: 'Scholarship Programme Launch', description: 'Formalising what had been an informal arrangement, Arintu launched a structured scholarship programme. Every class now reserves 20% of its seats for scholarship recipients — full or partial — chosen by the super admin.' },
+      { year: '2022', title: 'Scholarship Program Launch', description: 'Formalising what had been an informal arrangement, Arintu launched a structured scholarship program. Every class now reserves 20% of its seats for scholarship recipients — full or partial — chosen by the super admin.' },
       { year: '2023', title: '5,000 Learners', description: 'A milestone year. Arintu crossed 5,000 active learners, running over 40 concurrent classes taught by a faculty of 30+ teachers. Ashish Mathur joined as VP of Technology to lead the next phase of platform development.' },
       { year: '2024', title: 'AI-Assisted Learning', description: 'Arintu introduced its first AI-powered features: personalised practice recommendations, automatic progress summaries, and a smart scheduling assistant. The platform infrastructure was rebuilt from the ground up to support the next ten years of growth.' },
       { year: '2025', title: 'Community & Beyond', description: 'Arintu Online and Enfinitty Circle launched — connecting learners, alumni, and educators in a vibrant global community. The Book Club was introduced, giving every member a voice in shaping the curriculum. The journey continues.' },
@@ -26,9 +26,9 @@ const DEFAULTS = {
   faq: {
     items: [
       { q: "Who are Arintu's classes for?", a: 'Our classes are designed for motivated learners of all ages who want to go beyond what their local school or institution offers. We serve students from primary school through to working professionals looking to upskill.' },
-      { q: 'How do I enrol in a class?', a: 'Browse our class catalogue on the home page. Click "Apply Now" on any class you\'re interested in. You\'ll need to create a free account (or sign in) and submit an application. Applications are reviewed and you\'ll be notified of the outcome within a few days.' },
+      { q: 'How do I enroll in a class?', a: 'Browse our class catalog on the home page. Click "Apply Now" on any class you\'re interested in. You\'ll need to create a free account (or sign in) and submit an application. Applications are reviewed and you\'ll be notified of the outcome within a few days.' },
       { q: 'Is there an application fee?', a: "Yes, there is a one-time application fee that varies by country. The fee is charged on your first class application and is waived for all subsequent classes. If you're unable to pay the fee, you can request a waiver from your dashboard — a super admin will review your request." },
-      { q: 'What is the scholarship programme?', a: 'Every class reserves up to 20% of its seats for scholarship recipients. Scholarships can be full (class fee fully covered) or partial (a percentage discount). You can request a scholarship when you apply for a class. The super admin makes all scholarship decisions.' },
+      { q: 'What is the scholarship program?', a: 'Every class reserves up to 20% of its seats for scholarship recipients. Scholarships can be full (class fee fully covered) or partial (a percentage discount). You can request a scholarship when you apply for a class. The super admin makes all scholarship decisions.' },
       { q: 'Are classes live or recorded?', a: 'Our classes are primarily live, conducted over Zoom at scheduled times. Recorded sessions are made available to enrolled students for review. We believe live interaction between students and teachers is essential to the Arintu learning experience.' },
       { q: 'What languages are classes taught in?', a: 'The majority of our classes are taught in English. We periodically offer classes in Hindi and other languages — check the class description for language details.' },
       { q: "Can I drop a class once I've enrolled?", a: 'Please contact your class teacher or reach out to us at infoenfinitty@gmail.com. Refund and withdrawal policies depend on the class and how far along the course has progressed.' },
@@ -76,7 +76,7 @@ const DEFAULTS = {
   arintu_online: {
     hero_badge: '🌐 All classes. One platform.',
     hero_title: 'Arintu Online',
-    hero_subtitle: "Every Arintu class runs on our integrated online platform — purpose-built for deep learning, not just content delivery. Here's what you get when you enrol.",
+    hero_subtitle: "Every Arintu class runs on our integrated online platform — purpose-built for deep learning, not just content delivery. Here's what you get when you enroll.",
     features: [
       { icon: '🎥', title: 'Live Classes via Zoom', desc: 'All Arintu sessions run live, so you learn in real time alongside classmates from around the world. Every class is capped to keep the teacher-student ratio high.' },
       { icon: '📼', title: 'Session Recordings', desc: 'Miss a session or want to review? Enrolled students have access to recordings for the duration of their course. Learn at your own pace without falling behind.' },
@@ -89,7 +89,7 @@ const DEFAULTS = {
     how_it_works: [
       { step: '01', label: 'Browse classes', desc: 'Find the right class for your level and schedule.' },
       { step: '02', label: 'Apply', desc: 'Create an account and submit your application in minutes.' },
-      { step: '03', label: 'Get approved', desc: 'An admin reviews your application and enrols you.' },
+      { step: '03', label: 'Get approved', desc: 'An admin reviews your application and enrolls you.' },
       { step: '04', label: 'Start learning', desc: 'Join your first live session and never look back.' },
     ],
   },
@@ -108,7 +108,7 @@ const DEFAULTS = {
   contact: {
     email: 'infoenfinitty@gmail.com',
     address_lines: ['12268 Darkwood Road', 'San Diego, CA 92129', 'United States'],
-    response_time: 'We aim to respond to all enquiries within one business day (Monday–Friday, 9 AM–6 PM PT).',
+    response_time: 'We aim to respond to all inquiries within one business day (Monday–Friday, 9 AM–6 PM PT).',
   },
 };
 

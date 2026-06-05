@@ -4,7 +4,7 @@
  * Sizes:
  *   sm  — compact inline use (footer, breadcrumbs)
  *   md  — default: wordmark + tagline (sidebar, header)
- *   lg  — large centred use (login / register pages)
+ *   lg  — large centered use (login / register pages)
  *
  * showTagline (default true for md/lg, false for sm) controls the
  * "ENRICH YOUR SKILLS" subtitle.  The old `showText` prop is still
