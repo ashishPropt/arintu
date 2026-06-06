@@ -75,12 +75,14 @@ export default function Login() {
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-brand-50 via-white to-accent-50 p-4">
       <div className="w-full max-w-sm">
         <div className="text-center mb-8">
-          <div className="flex justify-center mb-3">
-            <Logo size="lg" showText={false} />
-          </div>
-          <h1 className="text-2xl font-bold bg-gradient-to-r from-brand-600 to-accent-500 bg-clip-text text-transparent">
-            Arintu
-          </h1>
+          <Link to="/" className="inline-block group" title="Back to home">
+            <div className="flex justify-center mb-3">
+              <Logo size="lg" showText={false} />
+            </div>
+            <h1 className="text-2xl font-bold bg-gradient-to-r from-brand-600 to-accent-500 bg-clip-text text-transparent group-hover:opacity-80 transition-opacity">
+              Arintu
+            </h1>
+          </Link>
           <p className="text-gray-500 text-sm mt-1">Education Management Platform</p>
         </div>
 
@@ -184,7 +186,13 @@ export default function Login() {
           )}
         </div>
 
-        <p className="text-center text-xs text-gray-400 mt-6">
+        <div className="text-center mt-4">
+          <Link to="/" className="text-xs text-gray-500 hover:text-brand-600 hover:underline">
+            ← Back to home
+          </Link>
+        </div>
+
+        <p className="text-center text-xs text-gray-400 mt-4">
           © {new Date().getFullYear()} Arintu. All rights reserved.
         </p>
       </div>
