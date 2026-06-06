@@ -614,6 +614,9 @@ function ScholarshipRequestModal({ appId, className, onClose, onBack, onSubmitte
 
 // ── Admin / Teacher tabbed class modal ────────────────────────────────────────
 function AdminClassModal({ classId, onClose, onChanged, teachers, students, countries, isAdmin }) {
+  const { user } = useAuth();
+  const isTeacher = user?.role === 'teacher';
+
   const [data, setData] = useState(null);
   const [enrollments, setEnrollments] = useState([]);
   const [tab, setTab] = useState('info');
@@ -627,6 +630,9 @@ function AdminClassModal({ classId, onClose, onChanged, teachers, students, coun
   const [editMaxStudents,  setEditMaxStudents]  = useState(false);
   const [maxStudentsVal,   setMaxStudentsVal]   = useState('');
   const [savingMaxStudents, setSavingMaxStudents] = useState(false);
+  const [editDesc,    setEditDesc]    = useState(false);
+  const [descVal,     setDescVal]     = useState('');
+  const [savingDesc,  setSavingDesc]  = useState(false);
 
   useEffect(() => {
     classesApi.get(classId).then((r) => setData(r.data)).catch(() => {});
@@ -748,7 +754,60 @@ function AdminClassModal({ classId, onClose, onChanged, teachers, students, coun
               </div>
             </div>
           )}
-          {data.description && <p className="text-gray-600 text-xs mt-2">{data.description}</p>}
+          {/* Description — editable by admin/superadmin and assigned teacher */}
+          <div className="py-1 border-b border-gray-50">
+            <div className="flex items-center justify-between mb-1">
+              <span className="text-gray-500 text-xs font-medium">Description</span>
+              {(isAdmin || isTeacher) && !editDesc && (
+                <button
+                  onClick={() => { setDescVal(data.description || ''); setEditDesc(true); }}
+                  className="text-xs text-brand-500 hover:text-brand-700 hover:underline"
+                >
+                  {data.description ? 'Edit' : '+ Add'}
+                </button>
+              )}
+            </div>
+            {editDesc ? (
+              <div className="space-y-2">
+                <textarea
+                  autoFocus
+                  rows={5}
+                  className="input text-sm w-full"
+                  value={descVal}
+                  onChange={(e) => setDescVal(e.target.value)}
+                  placeholder="Describe what students will learn in this class…"
+                />
+                <div className="flex gap-2">
+                  <button
+                    disabled={savingDesc}
+                    onClick={async () => {
+                      setSavingDesc(true);
+                      try {
+                        await classesApi.update(classId, { description: descVal });
+                        const res = await classesApi.get(classId);
+                        setData(res.data);
+                        onChanged();
+                        setEditDesc(false);
+                      } catch {} finally { setSavingDesc(false); }
+                    }}
+                    className="text-xs px-3 py-1 bg-brand-600 text-white rounded-lg hover:bg-brand-700 disabled:opacity-50"
+                  >
+                    {savingDesc ? 'Saving…' : 'Save'}
+                  </button>
+                  <button
+                    onClick={() => setEditDesc(false)}
+                    className="text-xs px-3 py-1 border border-gray-200 rounded-lg hover:bg-gray-50"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <p className="text-gray-600 text-xs leading-relaxed">
+                {data.description || <span className="text-gray-400 italic">No description yet.</span>}
+              </p>
+            )}
+          </div>
 
           {/* ── Danger zone ── */}
           {isAdmin && (

@@ -186,39 +186,73 @@ router.get('/:id', authenticate, async (req, res) => {
 });
 
 // PUT /api/classes/:id
-router.put('/:id', authenticate, authorize('admin', 'superadmin'), async (req, res) => {
-  const { name, description, subject, level, maxStudents, isActive, enrollmentDeadline,
-          allowLateEnrollment, prerequisiteClassIds } = req.body;
+// Admin/superadmin can update all fields.
+// A teacher assigned to the class (via class_schedules) can update description only.
+router.put('/:id', authenticate, async (req, res) => {
+  const { role, id: userId } = req.user;
+  const classId = req.params.id;
 
   try {
-    const params = [name, description, subject, level, maxStudents, isActive,
-                    enrollmentDeadline, allowLateEnrollment];
-    const result = await db.query(
-      `UPDATE classes SET
-         name                 = COALESCE($1, name),
-         description          = COALESCE($2, description),
-         subject              = COALESCE($3, subject),
-         level                = COALESCE($4, level),
-         max_students         = COALESCE($5, max_students),
-         is_active            = COALESCE($6, is_active),
-         enrollment_deadline  = COALESCE($7, enrollment_deadline),
-         allow_late_enrollment = COALESCE($8, allow_late_enrollment),
-         updated_at           = NOW()
-       WHERE id = $9 AND ($10 = 'superadmin' OR admin_id = $11)
-       RETURNING *`,
-      [...params, req.params.id, req.user.role, req.user.id]
-    );
+    const isAdminRole = ['admin', 'superadmin'].includes(role);
+
+    // Teachers: check if assigned to this class via class_schedules
+    let isAssignedTeacher = false;
+    if (role === 'teacher') {
+      const assigned = await db.query(
+        `SELECT 1 FROM class_schedules
+         WHERE class_id = $1 AND teacher_id = $2
+         LIMIT 1`,
+        [classId, userId]
+      );
+      isAssignedTeacher = assigned.rows.length > 0;
+    }
+
+    if (!isAdminRole && !isAssignedTeacher) {
+      return res.status(403).json({ error: 'Not authorized to edit this class' });
+    }
+
+    const { name, description, subject, level, maxStudents, isActive,
+            enrollmentDeadline, allowLateEnrollment, prerequisiteClassIds } = req.body;
+
+    let result;
+    if (isAdminRole) {
+      // Full edit for admin/superadmin
+      result = await db.query(
+        `UPDATE classes SET
+           name                  = COALESCE($1, name),
+           description           = COALESCE($2, description),
+           subject               = COALESCE($3, subject),
+           level                 = COALESCE($4, level),
+           max_students          = COALESCE($5, max_students),
+           is_active             = COALESCE($6, is_active),
+           enrollment_deadline   = COALESCE($7, enrollment_deadline),
+           allow_late_enrollment = COALESCE($8, allow_late_enrollment),
+           updated_at            = NOW()
+         WHERE id = $9
+         RETURNING *`,
+        [name, description, subject, level, maxStudents, isActive,
+         enrollmentDeadline, allowLateEnrollment, classId]
+      );
+    } else {
+      // Teachers: description only
+      result = await db.query(
+        `UPDATE classes SET description = $1, updated_at = NOW()
+         WHERE id = $2 RETURNING *`,
+        [description ?? null, classId]
+      );
+    }
+
     if (!result.rows[0]) return res.status(404).json({ error: 'Class not found' });
 
-    // Replace prerequisites if provided
-    if (Object.prototype.hasOwnProperty.call(req.body, 'prerequisiteClassIds')) {
-      await db.query('DELETE FROM class_prerequisites WHERE class_id = $1', [req.params.id]);
+    // Replace prerequisites if provided (admin only)
+    if (isAdminRole && Object.prototype.hasOwnProperty.call(req.body, 'prerequisiteClassIds')) {
+      await db.query('DELETE FROM class_prerequisites WHERE class_id = $1', [classId]);
       const prereqIds = Array.isArray(prerequisiteClassIds) ? prerequisiteClassIds.filter(Boolean) : [];
       if (prereqIds.length > 0) {
         const placeholders = prereqIds.map((_, i) => `($1, $${i + 2})`).join(', ');
         await db.query(
           `INSERT INTO class_prerequisites (class_id, prerequisite_class_id) VALUES ${placeholders} ON CONFLICT DO NOTHING`,
-          [req.params.id, ...prereqIds]
+          [classId, ...prereqIds]
         );
       }
     }
