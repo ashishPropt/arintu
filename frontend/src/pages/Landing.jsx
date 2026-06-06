@@ -518,6 +518,21 @@ function LoginForm({ onSuccess }) {
 
 // ─── Class Card ─────────────────────────────────────────────────────────────
 
+const DAY_NAMES = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+
+function formatSlotTime(isoString) {
+  if (!isoString) return '';
+  const d = new Date(isoString);
+  // Display in PST (UTC-8)
+  const utcH = d.getUTCHours();
+  const utcM = d.getUTCMinutes();
+  const pstH = ((utcH - 8) + 24) % 24;
+  const ampm = pstH >= 12 ? 'PM' : 'AM';
+  const h12  = pstH % 12 || 12;
+  const mm   = utcM === 0 ? '' : `:${String(utcM).padStart(2,'0')}`;
+  return `${h12}${mm} ${ampm}`;
+}
+
 function ClassCard({ cls, selectedCountry, user, onApply }) {
   const teacher = cls.teachers?.[0];
   const [descExpanded, setDescExpanded] = useState(false);
@@ -570,6 +585,28 @@ function ClassCard({ cls, selectedCountry, user, onApply }) {
                 {descExpanded ? 'See less' : 'See more'}
               </button>
             )}
+          </div>
+        )}
+
+        {cls.schedules && cls.schedules.length > 0 && (
+          <div className="mb-3 border-t border-gray-50 pt-3">
+            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">Schedule</p>
+            <div className="space-y-1">
+              {cls.schedules.map((s) => (
+                <div key={s.session_code} className="flex items-center gap-2 text-xs text-gray-600">
+                  <span className="font-medium text-brand-600 w-14 shrink-0">{s.session_code}</span>
+                  <span>{DAY_NAMES[s.day_of_week]}s</span>
+                  <span className="text-gray-400">·</span>
+                  <span>{formatSlotTime(s.start_time)}–{formatSlotTime(s.end_time)} PST</span>
+                  {s.teacher && (
+                    <>
+                      <span className="text-gray-300">·</span>
+                      <span className="text-gray-400">{s.teacher.split(' ').pop()}</span>
+                    </>
+                  )}
+                </div>
+              ))}
+            </div>
           </div>
         )}
 
