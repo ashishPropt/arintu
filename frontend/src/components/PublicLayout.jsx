@@ -18,7 +18,6 @@ const communityLinks = [
   { to: '/community/enfinitty-circle',   label: 'Enfinitty Circle' },
   { to: '/community/testimonials',       label: 'Testimonials' },
   { to: '/community/gallery',            label: '📷 Gallery' },
-  { to: '/blog',                         label: '📝 Blog' },
 ];
 
 function NavDropdown({ label, links, onNavigate }) {
@@ -89,6 +88,12 @@ export default function PublicLayout() {
             <NavDropdown label="About Us" links={aboutLinks} />
             <NavDropdown label="Community" links={communityLinks} />
             <Link
+              to="/blog"
+              className="text-sm font-medium text-gray-600 hover:text-gray-900 px-3 py-2 rounded-lg hover:bg-gray-50 transition-colors"
+            >
+              Blog
+            </Link>
+            <Link
               to="/contact"
               className="text-sm font-medium text-gray-600 hover:text-gray-900 px-3 py-2 rounded-lg hover:bg-gray-50 transition-colors"
             >
@@ -143,6 +148,10 @@ export default function PublicLayout() {
                 {label}
               </Link>
             ))}
+            <Link to="/blog" onClick={() => setMobileOpen(false)}
+              className="block mt-3 px-3 py-2 rounded-lg text-sm font-medium text-gray-700 hover:bg-brand-50 hover:text-brand-700">
+              📝 Blog
+            </Link>
             <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider pt-2 pb-1 px-2">Legal</p>
             <Link to="/contact" onClick={() => setMobileOpen(false)}
               className="block px-3 py-2 rounded-lg text-sm text-gray-700 hover:bg-brand-50 hover:text-brand-700">
@@ -199,6 +208,7 @@ export default function PublicLayout() {
                   <Link to={to} className="text-sm text-gray-500 hover:text-brand-600">{label}</Link>
                 </li>
               ))}
+              <li><Link to="/blog" className="text-sm text-gray-500 hover:text-brand-600">📝 Blog</Link></li>
             </ul>
           </div>
           <div>
