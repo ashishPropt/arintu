@@ -142,11 +142,18 @@ router.post('/', authenticate, authorize('student'), async (req, res) => {
     }
 
     // ── 5. Is first-time student? ─────────────────────────────────────────────
-    const enrollCount = await db.query(
-      'SELECT COUNT(*) FROM enrollments WHERE student_id = $1',
+    // App fee is one-time. The student is "first-time" only if they have NEVER
+    // paid (or had waived) an application fee on any prior application.
+    // Checking enrollments alone is wrong — enrollment requires class-fee
+    // payment too, so between applications a student looked "first-time" even
+    // though they had already paid the app fee.
+    const priorAppFeeRes = await db.query(
+      `SELECT COUNT(*) AS cnt FROM class_applications
+       WHERE student_id = $1
+         AND payment_status IN ('paid', 'waived')`,
       [studentId]
     );
-    const isFirstTime = parseInt(enrollCount.rows[0].count) === 0;
+    const isFirstTime = parseInt(priorAppFeeRes.rows[0].cnt) === 0;
 
     // ── 6. Application fee determination (flat 500 INR, auto-converted) ─────
     let appFeeHandled = !isFirstTime;   // returning students skip app fee
