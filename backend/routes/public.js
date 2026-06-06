@@ -37,7 +37,11 @@ router.get('/classes', async (req, res) => {
                      'day_of_week',  cs2.day_of_week,
                      'start_time',   cs2.start_time,
                      'end_time',     cs2.end_time,
-                     'teacher',      tu.name
+                     'teacher',      tu.name,
+                     'capacity',     c.max_students,
+                     'enrolled_count',
+                       (SELECT COUNT(*) FROM enrollments e
+                        WHERE e.class_id = c.id AND e.schedule_code = cs2.session_code)
                    ) AS slot
                  FROM class_schedules cs2
                  LEFT JOIN users tu ON tu.id = cs2.teacher_id

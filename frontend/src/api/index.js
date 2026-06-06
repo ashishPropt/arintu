@@ -98,8 +98,8 @@ export const countries = {
 export const applications = {
   list: (params) => api.get('/applications', { params }),
   myAppFee: (countryCode) => api.get('/applications/my-app-fee', { params: { countryCode } }),
-  apply: (classId, countryCode, scholarshipRequested, scholarshipType, scholarshipReason) =>
-    api.post('/applications', { classId, countryCode, scholarshipRequested, scholarshipType, scholarshipReason }),
+  apply: (classId, countryCode, scholarshipRequested, scholarshipType, scholarshipReason, scheduleCode) =>
+    api.post('/applications', { classId, countryCode, scholarshipRequested, scholarshipType, scholarshipReason, scheduleCode }),
   approve: (id) => api.put(`/applications/${id}/approve`),
   reject: (id, notes) => api.put(`/applications/${id}/reject`, { notes }),
   awardScholarship: (id, action, type, discountPct) =>

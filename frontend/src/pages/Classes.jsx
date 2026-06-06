@@ -220,28 +220,39 @@ function StudentClassCard({ cls, myApp, selectedCountry, onApply, onView }) {
         {cls.schedules && cls.schedules.length > 0 && (
           <div className="mb-3 border-t border-gray-50 pt-3">
             <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">Schedule</p>
-            <div className="space-y-1">
-              {cls.schedules.map((s) => (
-                <div key={s.session_code} className="flex items-center gap-2 text-xs text-gray-600">
-                  <span className="font-medium text-brand-600 w-14 shrink-0">{s.session_code}</span>
-                  <span>{DAY_NAMES[s.day_of_week]}s</span>
-                  <span className="text-gray-400">·</span>
-                  <span>{formatSlotTime(s.start_time)}–{formatSlotTime(s.end_time)} PST</span>
-                  {s.teacher && (
-                    <>
-                      <span className="text-gray-300">·</span>
-                      <span className="text-gray-400">{s.teacher.split(' ').pop()}</span>
-                    </>
-                  )}
-                </div>
-              ))}
+            <div className="space-y-1.5">
+              {cls.schedules.map((s) => {
+                const enrolled = Number(s.enrolled_count) || 0;
+                const capacity = Number(s.capacity) || 0;
+                const isFull   = capacity > 0 && enrolled >= capacity;
+                return (
+                  <div key={s.session_code} className="text-xs">
+                    <div className="flex items-center gap-2 text-gray-600">
+                      <span className="font-medium text-brand-600 w-14 shrink-0">{s.session_code}</span>
+                      <span>{DAY_NAMES[s.day_of_week]}s</span>
+                      <span className="text-gray-400">·</span>
+                      <span>{formatSlotTime(s.start_time)}–{formatSlotTime(s.end_time)} PST</span>
+                      {s.teacher && (
+                        <>
+                          <span className="text-gray-300">·</span>
+                          <span className="text-gray-400">{s.teacher.split(' ').pop()}</span>
+                        </>
+                      )}
+                    </div>
+                    <div className="ml-16 text-[11px] text-gray-400">
+                      {isFull
+                        ? <span className="text-red-500 font-medium">Full</span>
+                        : `${enrolled}/${capacity} enrolled`}
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           </div>
         )}
 
         <div className="mt-auto space-y-2">
           <div className="flex items-center gap-3 text-xs text-gray-500">
-            <span>👤 {cls.enrolled_count || 0}/{cls.max_students} enrolled</span>
             {cls.teachers?.[0] && <span>🎓 {cls.teachers[0].name}</span>}
           </div>
           <button

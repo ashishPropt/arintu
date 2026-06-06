@@ -101,12 +101,16 @@ router.get('/my-app-fee', authenticate, authorize('student'), async (req, res) =
 });
 
 router.post('/', authenticate, authorize('student'), async (req, res) => {
-  const { classId, scholarshipRequested, scholarshipType, scholarshipReason } = req.body;
+  const { classId, scheduleCode, scholarshipRequested, scholarshipType, scholarshipReason } = req.body;
   const studentId = req.user.id;
 
   // Validate scholarship request — reason is required when checkbox is ticked
   if (scholarshipRequested && !String(scholarshipReason || '').trim()) {
     return res.status(400).json({ error: 'Please describe why you are requesting a scholarship.' });
+  }
+  // Schedule code is required so we know which slot the student picked
+  if (!scheduleCode) {
+    return res.status(400).json({ error: 'Please pick a schedule for this class.' });
   }
 
   try {
@@ -139,6 +143,30 @@ router.post('/', authenticate, authorize('student'), async (req, res) => {
     // ── 3. Class exists and is active ─────────────────────────────────────────
     const cls = await db.query('SELECT * FROM classes WHERE id = $1 AND is_active = TRUE', [classId]);
     if (!cls.rows[0]) return res.status(404).json({ error: 'Class not found or inactive' });
+
+    // ── 3a. Schedule exists for this class ────────────────────────────────────
+    const schedRes = await db.query(
+      `SELECT DISTINCT session_code
+       FROM class_schedules
+       WHERE class_id = $1 AND session_code = $2`,
+      [classId, scheduleCode]
+    );
+    if (!schedRes.rows[0]) {
+      return res.status(400).json({ error: 'Invalid schedule for this class.' });
+    }
+
+    // ── 3a-ii. Per-schedule capacity check ────────────────────────────────────
+    const perScheduleCap = parseInt(cls.rows[0].max_students || 0);
+    if (perScheduleCap > 0) {
+      const enrolledInSlot = await db.query(
+        `SELECT COUNT(*) AS cnt FROM enrollments
+         WHERE class_id = $1 AND schedule_code = $2`,
+        [classId, scheduleCode]
+      );
+      if (parseInt(enrolledInSlot.rows[0].cnt) >= perScheduleCap) {
+        return res.status(409).json({ error: `That schedule (${scheduleCode}) is full. Please pick another one.` });
+      }
+    }
 
     // ── 3b. Prerequisite check (all prerequisites must be met) ───────────────
     const prereqRows = await db.query(
@@ -285,8 +313,9 @@ router.post('/', authenticate, authorize('student'), async (req, res) => {
       `INSERT INTO class_applications
          (class_id, student_id, country_id, application_fee_charged, currency_code, fee_waived,
           payment_status, class_fee_status, class_fee_amount,
-          scholarship_requested, scholarship_type, scholarship_reason)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
+          scholarship_requested, scholarship_type, scholarship_reason,
+          schedule_code)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
        RETURNING *`,
       [
         classId, studentId, countryId,
@@ -297,6 +326,7 @@ router.post('/', authenticate, authorize('student'), async (req, res) => {
         initialClassFeeStatus,
         classPrice || null,
         wantsScholarship, schType, schReason,
+        scheduleCode,
       ]
     );
     const applicationId = result.rows[0].id;
@@ -333,7 +363,7 @@ router.post('/', authenticate, authorize('student'), async (req, res) => {
         currency: currencyCode,
         name: `Application Fee — ${cls.rows[0].name}`,
         desc: `One-time registration fee. Waived on all future class applications.`,
-        metadata: { applicationId, studentId, classId, feeType: 'app_fee' },
+        metadata: { applicationId, studentId, classId, scheduleCode, feeType: 'app_fee' },
         frontendUrl,
         applicationId,
       });
@@ -351,7 +381,7 @@ router.post('/', authenticate, authorize('student'), async (req, res) => {
         currency: classCurrency,
         name: `Class Fee — ${cls.rows[0].name}`,
         desc: `Tuition fee for the class.`,
-        metadata: { applicationId, studentId, classId, feeType: 'class_fee' },
+        metadata: { applicationId, studentId, classId, scheduleCode, feeType: 'class_fee' },
         frontendUrl,
         applicationId,
       });
@@ -364,8 +394,9 @@ router.post('/', authenticate, authorize('student'), async (req, res) => {
       // Free class — enroll immediately
       await db.query(`UPDATE class_applications SET status = 'approved', class_fee_status = 'not_required' WHERE id = $1`, [applicationId]);
       await db.query(
-        `INSERT INTO enrollments (class_id, student_id, payment_status) VALUES ($1,$2,'paid') ON CONFLICT DO NOTHING`,
-        [classId, studentId]
+        `INSERT INTO enrollments (class_id, student_id, schedule_code, payment_status)
+         VALUES ($1,$2,$3,'paid') ON CONFLICT DO NOTHING`,
+        [classId, studentId, scheduleCode]
       );
       const admin = await db.query('SELECT admin_id FROM classes WHERE id = $1', [classId]);
       if (admin.rows[0]) {

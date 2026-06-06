@@ -84,9 +84,9 @@ module.exports = async function stripeWebhook(req, res) {
                 [applicationId]
               );
               await db.query(
-                `INSERT INTO enrollments (class_id, student_id, payment_status)
-                 VALUES ($1, $2, 'paid') ON CONFLICT DO NOTHING`,
-                [app.class_id, app.student_id]
+                `INSERT INTO enrollments (class_id, student_id, schedule_code, payment_status)
+                 VALUES ($1, $2, $3, 'paid') ON CONFLICT DO NOTHING`,
+                [app.class_id, app.student_id, app.schedule_code]
               );
               await db.query(
                 `INSERT INTO notifications (user_id, title, message, type)
@@ -149,9 +149,9 @@ module.exports = async function stripeWebhook(req, res) {
             );
 
             await db.query(
-              `INSERT INTO enrollments (class_id, student_id, payment_status)
-               VALUES ($1, $2, 'paid') ON CONFLICT DO NOTHING`,
-              [app.class_id, app.student_id]
+              `INSERT INTO enrollments (class_id, student_id, schedule_code, payment_status)
+               VALUES ($1, $2, $3, 'paid') ON CONFLICT DO NOTHING`,
+              [app.class_id, app.student_id, app.schedule_code]
             );
 
             // Notify student

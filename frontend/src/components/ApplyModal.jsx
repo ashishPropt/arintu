@@ -2,6 +2,17 @@ import { useState, useEffect } from 'react';
 import Modal from './Modal';
 import { applications } from '../api';
 
+const DAY_NAMES = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+function fmtTime(iso) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  const pstH = ((d.getUTCHours() - 8) + 24) % 24;
+  const ampm = pstH >= 12 ? 'PM' : 'AM';
+  const h12  = pstH % 12 || 12;
+  const mm   = d.getUTCMinutes() === 0 ? '' : `:${String(d.getUTCMinutes()).padStart(2,'0')}`;
+  return `${h12}${mm} ${ampm}`;
+}
+
 function Row({ label, value }) {
   return (
     <div className="flex justify-between">
@@ -21,6 +32,13 @@ export default function ApplyModal({ cls, countryCode, country, onClose, onAppli
   const [scholarshipRequested, setScholarshipRequested] = useState(false);
   const [scholarshipType, setScholarshipType] = useState('full');
   const [scholarshipReason, setScholarshipReason] = useState('');
+
+  // Schedule picker — student must choose one slot to enroll in.
+  // Auto-pick the first available slot to make the default sensible.
+  const availableSchedules = (cls.schedules || []).filter(
+    (s) => (Number(s.enrolled_count) || 0) < (Number(s.capacity) || 1e9)
+  );
+  const [scheduleCode, setScheduleCode] = useState(availableSchedules[0]?.session_code || '');
 
   // Waiver blocked: student has a pending waiver request
   if (cls._waiverBlocked) {
@@ -51,6 +69,10 @@ export default function ApplyModal({ cls, countryCode, country, onClose, onAppli
   }, [countryCode, country]);
 
   const submit = async () => {
+    if (!scheduleCode) {
+      setError('Please pick a schedule first.');
+      return;
+    }
     if (scholarshipRequested && !scholarshipReason.trim()) {
       setError('Please describe why you are requesting a scholarship.');
       return;
@@ -64,6 +86,7 @@ export default function ApplyModal({ cls, countryCode, country, onClose, onAppli
         scholarshipRequested,
         scholarshipRequested ? scholarshipType : undefined,
         scholarshipRequested ? scholarshipReason.trim() : undefined,
+        scheduleCode,
       );
       const data = res.data;
 
@@ -127,6 +150,63 @@ export default function ApplyModal({ cls, countryCode, country, onClose, onAppli
               <Row label="Class Fee" value={`${country?.currency_symbol || ''}${Number(cls.price).toLocaleString()} ${cls.currency_code}`} />
             )}
           </div>
+
+          {/* Schedule picker — required */}
+          {(cls.schedules || []).length > 0 && (
+            <div>
+              <p className="text-xs font-semibold text-gray-700 mb-2">
+                Pick a schedule <span className="text-red-500">*</span>
+              </p>
+              <div className="space-y-2">
+                {cls.schedules.map((s) => {
+                  const enrolled = Number(s.enrolled_count) || 0;
+                  const capacity = Number(s.capacity) || 0;
+                  const isFull   = capacity > 0 && enrolled >= capacity;
+                  const selected = scheduleCode === s.session_code;
+                  return (
+                    <label
+                      key={s.session_code}
+                      className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors text-sm ${
+                        isFull
+                          ? 'border-gray-100 bg-gray-50 opacity-50 cursor-not-allowed'
+                          : selected
+                          ? 'border-brand-400 bg-brand-50'
+                          : 'border-gray-200 hover:border-gray-300'
+                      }`}
+                    >
+                      <input
+                        type="radio"
+                        name="schedule"
+                        value={s.session_code}
+                        checked={selected}
+                        disabled={isFull}
+                        onChange={() => setScheduleCode(s.session_code)}
+                      />
+                      <div className="flex-1 min-w-0">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="font-semibold text-brand-600 text-xs">{s.session_code}</span>
+                          <span className="text-gray-800">{DAY_NAMES[s.day_of_week]}s</span>
+                          <span className="text-gray-400 text-xs">·</span>
+                          <span className="text-gray-700">{fmtTime(s.start_time)}–{fmtTime(s.end_time)} PST</span>
+                          {s.teacher && (
+                            <>
+                              <span className="text-gray-300 text-xs">·</span>
+                              <span className="text-xs text-gray-500">{s.teacher}</span>
+                            </>
+                          )}
+                        </div>
+                        <p className="text-xs text-gray-400 mt-0.5">
+                          {isFull
+                            ? 'Full — pick another schedule'
+                            : `${enrolled}/${capacity} enrolled · ${capacity - enrolled} ${capacity - enrolled === 1 ? 'spot' : 'spots'} left`}
+                        </p>
+                      </div>
+                    </label>
+                  );
+                })}
+              </div>
+            </div>
+          )}
 
           {/* Application fee — only shown if owed */}
           {feeInfo?.fee_waived || Number(feeInfo?.fee) === 0 ? (
