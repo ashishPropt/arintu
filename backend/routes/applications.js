@@ -43,8 +43,13 @@ async function createStripeSession({ stripe, email, amount, currency, name, desc
 // Phase 1: application fee (first-time students only)
 // Phase 2: class tuition fee (all students after app fee is settled)
 router.post('/', authenticate, authorize('student'), async (req, res) => {
-  const { classId } = req.body;
+  const { classId, scholarshipRequested, scholarshipType, scholarshipReason } = req.body;
   const studentId = req.user.id;
+
+  // Validate scholarship request — reason is required when checkbox is ticked
+  if (scholarshipRequested && !String(scholarshipReason || '').trim()) {
+    return res.status(400).json({ error: 'Please describe why you are requesting a scholarship.' });
+  }
 
   try {
     // ── 1. Load student record (verification status + stored country) ─────────
@@ -200,27 +205,54 @@ router.post('/', authenticate, authorize('student'), async (req, res) => {
     }
 
     // ── 8. Insert application ─────────────────────────────────────────────────
+    // If scholarship requested at apply-time, mark it so the admin sees it immediately.
+    const wantsScholarship = !!scholarshipRequested;
+    const schType    = wantsScholarship ? (scholarshipType === 'partial' ? 'pending' : 'pending') : 'none';
+    const schReason  = wantsScholarship ? String(scholarshipReason).trim() : null;
+    // Initial class_fee_status: if scholarship requested, mark scholarship_pending
+    // so the admin can act on it (but only if a class fee actually exists).
+    let initialClassFeeStatus = classFeeStatus;
+    if (wantsScholarship && classFeeStatus !== 'not_required') {
+      initialClassFeeStatus = 'scholarship_pending';
+    }
+
     const result = await db.query(
       `INSERT INTO class_applications
          (class_id, student_id, country_id, application_fee_charged, currency_code, fee_waived,
-          payment_status, class_fee_status, class_fee_amount, scholarship_requested, scholarship_type)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
+          payment_status, class_fee_status, class_fee_amount,
+          scholarship_requested, scholarship_type, scholarship_reason)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
        RETURNING *`,
       [
         classId, studentId, countryId,
         appFeeHandled ? 0 : (appFeeAmount || 0),
         currencyCode,
         appFeeStatus === 'waived',
-        appFeeHandled ? 'waived' : 'pending_payment',  // payment_status = app fee status
-        classFeeStatus,
+        appFeeHandled ? 'waived' : 'pending_payment',
+        initialClassFeeStatus,
         classPrice || null,
-        false, 'none',
+        wantsScholarship, schType, schReason,
       ]
     );
     const applicationId = result.rows[0].id;
     const frontendUrl   = process.env.FRONTEND_URL || 'http://localhost:5173';
     const student       = await db.query('SELECT name, email FROM users WHERE id = $1', [studentId]);
     const stripe        = getStripe();
+
+    // Notify class admin if scholarship requested at apply-time
+    if (wantsScholarship && cls.rows[0].admin_id) {
+      try {
+        await db.query(
+          `INSERT INTO notifications (user_id, title, message, type)
+           VALUES ($1, $2, $3, 'class')`,
+          [
+            cls.rows[0].admin_id,
+            `Scholarship request: ${cls.rows[0].name}`,
+            `${student.rows[0].name} applied to "${cls.rows[0].name}" and requested a ${scholarshipType || 'full'} scholarship. Reason: ${schReason}`,
+          ]
+        );
+      } catch (e) { console.error('scholarship notify failed:', e); }
+    }
 
     let checkoutUrl    = null;
     let stripeSessionId = null;

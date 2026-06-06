@@ -20,6 +20,7 @@ export default function ApplyModal({ cls, countryCode, country, onClose, onAppli
   const [success, setSuccess] = useState(false);
   const [scholarshipRequested, setScholarshipRequested] = useState(false);
   const [scholarshipType, setScholarshipType] = useState('full');
+  const [scholarshipReason, setScholarshipReason] = useState('');
 
   // Waiver blocked: student has a pending waiver request
   if (cls._waiverBlocked) {
@@ -48,6 +49,10 @@ export default function ApplyModal({ cls, countryCode, country, onClose, onAppli
   }, [countryCode, country]);
 
   const submit = async () => {
+    if (scholarshipRequested && !scholarshipReason.trim()) {
+      setError('Please describe why you are requesting a scholarship.');
+      return;
+    }
     setSubmitting(true);
     setError('');
     try {
@@ -55,7 +60,8 @@ export default function ApplyModal({ cls, countryCode, country, onClose, onAppli
         cls.id,
         countryCode,
         scholarshipRequested,
-        scholarshipRequested ? scholarshipType : undefined
+        scholarshipRequested ? scholarshipType : undefined,
+        scholarshipRequested ? scholarshipReason.trim() : undefined,
       );
       const data = res.data;
 
@@ -152,22 +158,37 @@ export default function ApplyModal({ cls, countryCode, country, onClose, onAppli
             </label>
 
             {scholarshipRequested && (
-              <div className="mt-3 ml-6 space-y-2">
-                <p className="text-xs font-medium text-gray-700">Scholarship type preference:</p>
-                {[
-                  { value: 'full',    label: 'Full scholarship', desc: 'Class fee fully covered' },
-                  { value: 'partial', label: 'Partial scholarship', desc: 'Partial reduction in class fee' },
-                ].map(({ value, label, desc }) => (
-                  <label key={value} className={`flex items-center gap-2.5 p-2.5 rounded-lg border cursor-pointer text-sm transition-colors ${scholarshipType === value ? 'border-brand-400 bg-brand-50' : 'border-gray-200'}`}>
-                    <input type="radio" name="scholType" value={value}
-                      checked={scholarshipType === value}
-                      onChange={() => setScholarshipType(value)} />
-                    <div>
-                      <span className="font-medium text-gray-900">{label}</span>
-                      <span className="text-gray-500 ml-1.5 text-xs">{desc}</span>
-                    </div>
+              <div className="mt-3 ml-6 space-y-3">
+                <div className="space-y-2">
+                  <p className="text-xs font-medium text-gray-700">Scholarship type preference:</p>
+                  {[
+                    { value: 'full',    label: 'Full scholarship', desc: 'Class fee fully covered' },
+                    { value: 'partial', label: 'Partial scholarship', desc: 'Partial reduction in class fee' },
+                  ].map(({ value, label, desc }) => (
+                    <label key={value} className={`flex items-center gap-2.5 p-2.5 rounded-lg border cursor-pointer text-sm transition-colors ${scholarshipType === value ? 'border-brand-400 bg-brand-50' : 'border-gray-200'}`}>
+                      <input type="radio" name="scholType" value={value}
+                        checked={scholarshipType === value}
+                        onChange={() => setScholarshipType(value)} />
+                      <div>
+                        <span className="font-medium text-gray-900">{label}</span>
+                        <span className="text-gray-500 ml-1.5 text-xs">{desc}</span>
+                      </div>
+                    </label>
+                  ))}
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">
+                    Reason for scholarship request <span className="text-red-500">*</span>
                   </label>
-                ))}
+                  <textarea
+                    className="input text-sm w-full"
+                    rows={3}
+                    placeholder="Briefly describe why you need a scholarship — financial situation, family circumstances, etc."
+                    value={scholarshipReason}
+                    onChange={(e) => setScholarshipReason(e.target.value)}
+                  />
+                  <p className="text-xs text-gray-400 mt-1">The admin will see this when reviewing your request.</p>
+                </div>
               </div>
             )}
           </div>

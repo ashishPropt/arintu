@@ -89,6 +89,7 @@ export default function Scholarships() {
                 <th className="text-left px-4 py-3 text-xs font-medium text-gray-500">Student</th>
                 <th className="text-left px-4 py-3 text-xs font-medium text-gray-500">Class</th>
                 <th className="text-left px-4 py-3 text-xs font-medium text-gray-500">Requested</th>
+                <th className="text-left px-4 py-3 text-xs font-medium text-gray-500">Reason</th>
                 <th className="text-left px-4 py-3 text-xs font-medium text-gray-500">App Status</th>
                 <th className="text-left px-4 py-3 text-xs font-medium text-gray-500">Scholarship</th>
                 <th className="px-4 py-3" />
@@ -106,6 +107,15 @@ export default function Scholarships() {
                     <span className={`badge ${a.scholarship_type === 'full' ? 'bg-purple-50 text-purple-700' : 'bg-blue-50 text-blue-700'}`}>
                       {a.scholarship_type === 'none' || !a.scholarship_type ? 'Partial or Full' : a.scholarship_type === 'full' ? 'Full' : 'Partial'}
                     </span>
+                  </td>
+                  <td className="px-4 py-3 max-w-xs">
+                    {a.scholarship_reason ? (
+                      <p className="text-xs text-gray-600 leading-relaxed line-clamp-3" title={a.scholarship_reason}>
+                        {a.scholarship_reason}
+                      </p>
+                    ) : (
+                      <span className="text-xs text-gray-300 italic">No reason given</span>
+                    )}
                   </td>
                   <td className="px-4 py-3">
                     <span className={`badge ${a.status === 'approved' ? 'bg-green-50 text-green-700' : a.status === 'rejected' ? 'bg-red-50 text-red-700' : 'bg-yellow-50 text-yellow-700'}`}>
@@ -181,6 +191,13 @@ function AwardModal({ app, onClose, onSaved }) {
           <p><span className="text-gray-500">Student:</span> <strong>{app.student_name}</strong></p>
           <p><span className="text-gray-500">Class:</span> {app.class_name}</p>
         </div>
+
+        {app.scholarship_reason && (
+          <div className="bg-blue-50 border border-blue-100 rounded-xl p-3">
+            <p className="text-xs font-semibold text-blue-700 mb-1">Reason for request</p>
+            <p className="text-sm text-blue-900 leading-relaxed whitespace-pre-wrap">{app.scholarship_reason}</p>
+          </div>
+        )}
 
         <div>
           <label className="block text-xs font-medium text-gray-700 mb-2">Scholarship Type</label>
