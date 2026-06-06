@@ -49,6 +49,7 @@ app.use('/api/family',        require('./routes/family'));
 app.use('/api/recordings',    require('./routes/recordings'));
 app.use('/api/gallery',       require('./routes/gallery'));
 app.use('/api/jobs',          require('./routes/jobs'));
+app.use('/api/blogs',         require('./routes/blogs'));
 
 app.get('/api/health', (req, res) => res.json({ status: 'ok', version: '1.0.0' }));
 

@@ -18,6 +18,7 @@ const communityLinks = [
   { to: '/community/enfinitty-circle',   label: 'Enfinitty Circle' },
   { to: '/community/testimonials',       label: 'Testimonials' },
   { to: '/community/gallery',            label: '📷 Gallery' },
+  { to: '/blog',                         label: '📝 Blog' },
 ];
 
 function NavDropdown({ label, links, onNavigate }) {

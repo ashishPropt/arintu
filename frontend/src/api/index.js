@@ -243,6 +243,24 @@ export const recordings = {
   byClass: (classId) => api.get(`/recordings/class/${classId}`),
 };
 
+export const blogs = {
+  // Public
+  list:     ()        => api.get('/blogs'),
+  bySlug:   (slug)    => api.get(`/blogs/${slug}`),
+  // Superadmin
+  listAll:  ()        => api.get('/blogs/admin/all'),
+  create:   (data)    => api.post('/blogs', data),
+  update:   (id,data) => api.put(`/blogs/${id}`, data),
+  remove:   (id)      => api.delete(`/blogs/${id}`),
+  uploadHero: (id, file) => {
+    const fd = new FormData();
+    fd.append('image', file);
+    return api.post(`/blogs/${id}/image`, fd, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+  },
+};
+
 export const jobs = {
   list:   ()         => api.get('/jobs'),
   create: (data)     => api.post('/jobs', data),

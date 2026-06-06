@@ -46,6 +46,9 @@ import PaymentSuccess from './pages/public/PaymentSuccess';
 import PaymentCancel from './pages/public/PaymentCancel';
 import Testimonials from './pages/public/Testimonials';
 import Gallery from './pages/public/Gallery';
+import Blog from './pages/public/Blog';
+import BlogPost from './pages/public/BlogPost';
+import ManageBlogs from './pages/superadmin/ManageBlogs';
 
 function RequireAuth({ children, roles }) {
   const { user, loading } = useAuth();
@@ -89,6 +92,8 @@ export default function App() {
             <Route path="/about/hq"        element={<HQAddress />} />
             <Route path="/about/history"   element={<History />} />
             <Route path="/about/jobs"      element={<Jobs />} />
+            <Route path="/blog"            element={<Blog />} />
+            <Route path="/blog/:slug"      element={<BlogPost />} />
             <Route path="/about/faq"       element={<FAQ />} />
             <Route path="/community/book-club"        element={<BookClub />} />
             <Route path="/community/arintu-online"    element={<ArintuOnline />} />
@@ -167,6 +172,11 @@ export default function App() {
             <Route path="manage-jobs" element={
               <RequireAuth roles={['superadmin']}>
                 <ManageJobs />
+              </RequireAuth>
+            } />
+            <Route path="manage-blogs" element={
+              <RequireAuth roles={['superadmin']}>
+                <ManageBlogs />
               </RequireAuth>
             } />
             <Route path="family" element={
