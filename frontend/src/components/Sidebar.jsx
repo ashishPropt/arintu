@@ -42,7 +42,7 @@ const navByRole = {
   student: [
     { to: '/',               label: 'Home',        icon: PublicHomeIcon, end: true },
     { to: '/app/dashboard',  label: 'Dashboard',  icon: HomeIcon },
-    { to: '/app/classes',    label: 'My Classes', icon: BookIcon },
+    { to: '/app/classes',    label: 'Classes',    icon: BookIcon },
     { to: '/app/schedules',  label: 'Schedule',   icon: CalIcon },
     { to: '/app/recordings', label: 'Recordings', icon: RecordingIcon },
     { to: '/app/family',     label: 'My Family',  icon: FamilyIcon },
