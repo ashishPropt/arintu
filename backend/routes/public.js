@@ -54,46 +54,80 @@ router.get('/classes', async (req, res) => {
        ORDER BY c.code ASC NULLS LAST, c.created_at DESC`
     );
 
-    // For each class, find the best price for the requested country
+    // For each class, find the best price for the requested country.
+    // Pricing strategy:
+    //   1. Country-specific price row → use as-is
+    //   2. Otherwise, take any pricing row (typically the USD anchor) and
+    //      convert into the requested country's currency via INR cross-rate
+    //      using countries.inr_exchange_rate.
     const result = await Promise.all(
       classes.rows.map(async (cls) => {
         let price = null;
         let currencyCode = null;
         let currencySymbol = null;
 
+        // 1. Country-specific exact match
         if (country) {
-          // Try country-specific price first
           const cp = await db.query(
-            `SELECT cp.price, cp.currency, co.currency_symbol
+            `SELECT cp.price, cp.currency
              FROM class_pricing cp
-             LEFT JOIN countries co ON co.currency_code = cp.currency
-             WHERE cp.class_id = $1 AND cp.country_id = $2`,
+             WHERE cp.class_id = $1 AND cp.country_id = $2
+             LIMIT 1`,
             [cls.id, country.id]
           );
           if (cp.rows[0]) {
-            price = cp.rows[0].price;
-            currencyCode = cp.rows[0].currency;
-            currencySymbol = country.currency_symbol;
+            price          = Number(cp.rows[0].price);
+            currencyCode   = cp.rows[0].currency;
+            currencySymbol = country.currency_symbol || '';
           }
         }
 
-        // Fall back to default price (no country_id, no region_id)
+        // 2. Otherwise pick any anchor pricing row + convert to local currency
         if (price === null) {
-          const dp = await db.query(
-            `SELECT price, currency FROM class_pricing
-             WHERE class_id = $1 AND country_id IS NULL AND is_default = TRUE
+          const anchor = await db.query(
+            `SELECT cp.price, cp.currency, co.inr_exchange_rate AS source_rate
+             FROM class_pricing cp
+             LEFT JOIN countries co ON co.id = cp.country_id
+             WHERE cp.class_id = $1
+             ORDER BY cp.is_default DESC, cp.created_at ASC
              LIMIT 1`,
             [cls.id]
           );
-          if (dp.rows[0]) {
-            price = dp.rows[0].price;
-            currencyCode = dp.rows[0].currency;
-            // Look up the symbol for the default currency (don't use the selected country's symbol)
-            const symRes = await db.query(
-              'SELECT currency_symbol FROM countries WHERE currency_code = $1 LIMIT 1',
-              [dp.rows[0].currency]
-            );
-            currencySymbol = symRes.rows[0]?.currency_symbol || '$';
+          if (anchor.rows[0]) {
+            const anchorPrice    = Number(anchor.rows[0].price);
+            const anchorCurrency = anchor.rows[0].currency;
+
+            // Source rate = INR-per-anchor-currency-unit.
+            // If the anchor row is country-bound, use that row's country rate.
+            // Otherwise, look up the country whose currency matches the anchor.
+            let sourceRate = anchor.rows[0].source_rate
+              ? Number(anchor.rows[0].source_rate) : null;
+            if (!sourceRate) {
+              const src = await db.query(
+                `SELECT inr_exchange_rate FROM countries WHERE currency_code = $1 LIMIT 1`,
+                [anchorCurrency]
+              );
+              sourceRate = src.rows[0]?.inr_exchange_rate
+                ? Number(src.rows[0].inr_exchange_rate) : 0.012; // assume USD if unknown
+            }
+
+            if (country && country.inr_exchange_rate) {
+              // Convert: anchor → INR → target local
+              const inrAmount  = anchorPrice / sourceRate;
+              const localPrice = inrAmount * Number(country.inr_exchange_rate);
+              price          = Math.max(1, Math.round(localPrice));
+              currencyCode   = country.currency_code;
+              currencySymbol = country.currency_symbol || '';
+            } else {
+              // No country chosen, or no FX rate — show in anchor currency as-is
+              price        = anchorPrice;
+              currencyCode = anchorCurrency;
+              const symRes = await db.query(
+                'SELECT currency_symbol FROM countries WHERE currency_code = $1 LIMIT 1',
+                [anchorCurrency]
+              );
+              currencySymbol = symRes.rows[0]?.currency_symbol || '$';
+            }
           }
         }
 
