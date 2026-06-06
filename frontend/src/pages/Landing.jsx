@@ -136,7 +136,7 @@ export default function Landing() {
                   Enfinitty takes pride in caring about, and believing in, student centered achievement. We are here to
                   mentor and support students from around the world and provide exceptional educational experiences that
                   prepare them for life. Students need to be excited and engaged in order to achieve academic excellence.
-                  Enfinitty's goal is just to provide this opportunity.
+                  Enfinitty's goal is to provide this opportunity.
                 </p>
                 <p>
                   We also believe in giving back to the community we serve. To support this commitment,{' '}
