@@ -28,9 +28,12 @@ export default function Landing() {
   const [countries, setCountries] = useState([]);
   const [selectedCode, setSelectedCode] = useState('US');
   const [classes, setClasses] = useState([]);
+  const [myApps, setMyApps] = useState([]);
   const [loading, setLoading] = useState(true);
   const [applyTarget, setApplyTarget] = useState(null);  // class to apply to (logged-in student)
   const [authTarget, setAuthTarget] = useState(null);    // class that triggered auth modal (guest)
+
+  const canApply = !user || ['student', 'parent'].includes(user.role);
 
   // Auto-detect country on mount
   useEffect(() => {
@@ -47,6 +50,21 @@ export default function Landing() {
   }, [selectedCode]);
 
   useEffect(() => { loadClasses(); }, [loadClasses]);
+
+  // Fetch this student/parent's applications so we can mark which classes
+  // they're already enrolled in / have applied to.
+  useEffect(() => {
+    if (user && ['student', 'parent'].includes(user.role)) {
+      applications.list()
+        .then((r) => setMyApps(Array.isArray(r.data) ? r.data : []))
+        .catch(() => setMyApps([]));
+    } else {
+      setMyApps([]);
+    }
+  }, [user]);
+
+  const appByClass = {};
+  for (const a of myApps) appByClass[a.class_id] = a;
 
   const selectedCountry = countries.find((c) => c.code === selectedCode);
 
@@ -202,6 +220,8 @@ export default function Landing() {
                 cls={c}
                 selectedCountry={selectedCountry}
                 user={user}
+                canApply={canApply}
+                myApp={appByClass[c.id]}
                 onApply={() => handleApply(c)}
               />
             ))}
@@ -534,7 +554,7 @@ function formatSlotTime(isoString) {
   return `${h12}${mm} ${ampm}`;
 }
 
-function ClassCard({ cls, selectedCountry, user, onApply }) {
+function ClassCard({ cls, selectedCountry, user, canApply, myApp, onApply }) {
   const teacher = cls.teachers?.[0];
   const [descExpanded, setDescExpanded] = useState(false);
   const CHAR_LIMIT = 120;
@@ -617,13 +637,74 @@ function ClassCard({ cls, selectedCountry, user, onApply }) {
             {teacher && <span>🎓 {teacher.name}</span>}
           </div>
 
-          <button
-            onClick={onApply}
-            disabled={Number(cls.enrolled_count) >= Number(cls.max_students)}
-            className="w-full btn-primary text-sm py-2 disabled:opacity-40"
-          >
-            {Number(cls.enrolled_count) >= Number(cls.max_students) ? 'Class Full' : 'Apply Now'}
-          </button>
+          {(() => {
+            // Admins / teachers / superadmins: no apply button at all
+            if (!canApply) return null;
+
+            // Class full → "Class Full" disabled
+            if (Number(cls.enrolled_count) >= Number(cls.max_students) && !myApp) {
+              return (
+                <button disabled className="w-full btn-primary text-sm py-2 opacity-40 cursor-not-allowed">
+                  Class Full
+                </button>
+              );
+            }
+
+            // Student/parent with existing application → reflect state
+            if (myApp) {
+              const cfs = myApp.class_fee_status;
+              const ps  = myApp.payment_status;
+              const st  = myApp.status;
+              const appFeeSettled = ['paid','waived','not_required'].includes(ps);
+              const isEnrolled    = st === 'approved' || ['paid','full_scholarship','not_required'].includes(cfs);
+              const isRejected    = st === 'rejected';
+              const isSchPending  = cfs === 'scholarship_pending';
+              const classFeeOwed  = appFeeSettled && cfs === 'pending_payment';
+              const appFeeOwed    = !appFeeSettled;
+
+              if (isEnrolled) {
+                return (
+                  <button disabled className="w-full text-sm py-2 px-3 rounded-lg border font-medium bg-green-50 border-green-200 text-green-700 cursor-default">
+                    ✓ Enrolled
+                  </button>
+                );
+              }
+              if (classFeeOwed || appFeeOwed) {
+                return (
+                  <button onClick={onApply} className="w-full text-sm py-2 px-3 rounded-lg border font-medium bg-amber-50 border-amber-200 text-amber-700 hover:bg-amber-100">
+                    {classFeeOwed ? 'Pay Class Fee →' : 'Complete Payment →'}
+                  </button>
+                );
+              }
+              if (isSchPending) {
+                return (
+                  <button disabled className="w-full text-sm py-2 px-3 rounded-lg border font-medium bg-purple-50 border-purple-200 text-purple-700 cursor-default">
+                    ⏳ Scholarship Pending
+                  </button>
+                );
+              }
+              if (isRejected) {
+                return (
+                  <button disabled className="w-full text-sm py-2 px-3 rounded-lg border font-medium bg-red-50 border-red-200 text-red-700 cursor-default">
+                    Application Rejected
+                  </button>
+                );
+              }
+              // Fallback for any other state
+              return (
+                <button disabled className="w-full text-sm py-2 px-3 rounded-lg border font-medium bg-gray-50 border-gray-200 text-gray-500 cursor-default">
+                  Application In Progress
+                </button>
+              );
+            }
+
+            // Fresh student/parent or guest → Apply Now
+            return (
+              <button onClick={onApply} className="w-full btn-primary text-sm py-2">
+                Apply Now
+              </button>
+            );
+          })()}
         </div>
       </div>
     </div>
