@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import Modal from './Modal';
-import { applications, publicApi } from '../api';
+import { applications } from '../api';
 
 function Row({ label, value }) {
   return (
@@ -42,7 +42,9 @@ export default function ApplyModal({ cls, countryCode, country, onClose, onAppli
   }
 
   useEffect(() => {
-    publicApi.applicationFee(countryCode)
+    // Use the authenticated endpoint that knows whether THIS student has
+    // already paid the app fee — returns { fee: 0, fee_waived: true } if so.
+    applications.myAppFee(countryCode)
       .then((r) => setFeeInfo(r.data))
       .catch(() => setFeeInfo({ fee: 15, currency_symbol: country?.currency_symbol || '$' }))
       .finally(() => setLoading(false));
@@ -126,12 +128,14 @@ export default function ApplyModal({ cls, countryCode, country, onClose, onAppli
             )}
           </div>
 
-          {/* Application fee */}
-          <div className={`rounded-xl p-4 text-sm ${feeInfo?.fee_waived || Number(feeInfo?.fee) === 0 ? 'bg-green-50 border border-green-100' : 'bg-amber-50 border border-amber-100'}`}>
-            <p className="font-medium text-gray-900 mb-1">Application Fee</p>
-            {feeInfo?.fee_waived || Number(feeInfo?.fee) === 0 ? (
-              <p className="text-green-700 text-xs">✅ Waived — your fee has been approved or you're already enrolled elsewhere.</p>
-            ) : (
+          {/* Application fee — only shown if owed */}
+          {feeInfo?.fee_waived || Number(feeInfo?.fee) === 0 ? (
+            <div className="rounded-xl p-3 text-xs text-green-700 bg-green-50 border border-green-100">
+              ✅ No application fee — you've already paid it on a previous application.
+            </div>
+          ) : (
+            <div className="rounded-xl p-4 text-sm bg-amber-50 border border-amber-100">
+              <p className="font-medium text-gray-900 mb-1">Application Fee</p>
               <div>
                 <p className="text-amber-700 font-semibold text-base">
                   {feeInfo?.currency_symbol || country?.currency_symbol || ''}{feeInfo?.fee}
@@ -139,8 +143,8 @@ export default function ApplyModal({ cls, countryCode, country, onClose, onAppli
                 </p>
                 <p className="text-amber-600 text-xs mt-0.5">One-time fee for your first class application.</p>
               </div>
-            )}
-          </div>
+            </div>
+          )}
 
           {/* Scholarship request */}
           <div className="border border-gray-200 rounded-xl p-4">
@@ -206,12 +210,24 @@ export default function ApplyModal({ cls, countryCode, country, onClose, onAppli
           <div className="flex gap-2 pt-1">
             <button onClick={onClose} className="btn-secondary flex-1">Cancel</button>
             <button onClick={submit} disabled={submitting} className="btn-primary flex-1">
-              {submitting
-                ? 'Processing…'
-                : (feeInfo?.fee_waived || Number(feeInfo?.fee) === 0)
-                  ? 'Submit Application'
-                  : `Pay ${feeInfo?.currency_symbol || ''}${feeInfo?.fee} & Apply`
-              }
+              {(() => {
+                if (submitting) return 'Processing…';
+                const appFeeOwed = !(feeInfo?.fee_waived || Number(feeInfo?.fee) === 0);
+                const classPrice = cls.price != null ? Number(cls.price) : null;
+                const classFeeOwed = classPrice && classPrice > 0 && !scholarshipRequested;
+                const sym = country?.currency_symbol || cls.currency_symbol || '';
+
+                if (appFeeOwed && classFeeOwed) {
+                  return `Pay ${feeInfo?.currency_symbol || ''}${feeInfo?.fee} App Fee & Apply`;
+                }
+                if (appFeeOwed) {
+                  return `Pay ${feeInfo?.currency_symbol || ''}${feeInfo?.fee} & Apply`;
+                }
+                if (classFeeOwed) {
+                  return `Pay ${sym}${classPrice.toLocaleString()} & Enroll`;
+                }
+                return 'Submit Application';
+              })()}
             </button>
           </div>
         </div>

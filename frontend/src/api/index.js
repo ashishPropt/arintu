@@ -97,6 +97,7 @@ export const countries = {
 
 export const applications = {
   list: (params) => api.get('/applications', { params }),
+  myAppFee: (countryCode) => api.get('/applications/my-app-fee', { params: { countryCode } }),
   apply: (classId, countryCode, scholarshipRequested, scholarshipType, scholarshipReason) =>
     api.post('/applications', { classId, countryCode, scholarshipRequested, scholarshipType, scholarshipReason }),
   approve: (id) => api.put(`/applications/${id}/approve`),

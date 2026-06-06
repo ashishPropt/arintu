@@ -42,6 +42,64 @@ async function createStripeSession({ stripe, email, amount, currency, name, desc
 // ── POST /api/applications  ── student submits an application ─────────────────
 // Phase 1: application fee (first-time students only)
 // Phase 2: class tuition fee (all students after app fee is settled)
+// GET /api/applications/my-app-fee?countryCode=US
+// Returns the application fee the LOGGED-IN student would pay if applying now.
+// If they've already paid (or had waived) the app fee on a prior application,
+// returns { fee: 0, waived: true } so the apply modal can hide the fee step.
+router.get('/my-app-fee', authenticate, authorize('student'), async (req, res) => {
+  const studentId = req.user.id;
+  const { countryCode } = req.query;
+  try {
+    // 1. Already paid before?
+    const prior = await db.query(
+      `SELECT COUNT(*) AS cnt FROM class_applications
+       WHERE student_id = $1 AND payment_status IN ('paid','waived')`,
+      [studentId]
+    );
+    if (parseInt(prior.rows[0].cnt) > 0) {
+      return res.json({ fee: 0, fee_waived: true, currency_code: 'USD', currency_symbol: '$' });
+    }
+
+    // 2. Fee waived globally for this student?
+    const waiverRes = await db.query(
+      `SELECT fee_waiver_status FROM users WHERE id = $1`,
+      [studentId]
+    );
+    if (waiverRes.rows[0]?.fee_waiver_status === 'approved') {
+      return res.json({ fee: 0, fee_waived: true, currency_code: 'USD', currency_symbol: '$' });
+    }
+
+    // 3. Otherwise compute fee from settings + country exchange rate
+    const settingsRes = await db.query(
+      `SELECT value FROM global_settings WHERE key = 'app_fee_inr'`
+    );
+    const baseINR = parseFloat(settingsRes.rows[0]?.value || '500');
+
+    if (countryCode) {
+      const cr = await db.query(
+        `SELECT id, name, currency_code, currency_symbol, inr_exchange_rate
+         FROM countries WHERE code = $1`,
+        [countryCode.toUpperCase()]
+      );
+      if (cr.rows[0]) {
+        const rate = parseFloat(cr.rows[0].inr_exchange_rate || 0.012);
+        return res.json({
+          fee:             Math.max(1, Math.round(baseINR * rate)),
+          fee_waived:      false,
+          currency_code:   cr.rows[0].currency_code,
+          currency_symbol: cr.rows[0].currency_symbol || '',
+          country_name:    cr.rows[0].name,
+        });
+      }
+    }
+    const usdFee = Math.max(1, Math.round(baseINR * 0.012));
+    res.json({ fee: usdFee, fee_waived: false, currency_code: 'USD', currency_symbol: '$' });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
 router.post('/', authenticate, authorize('student'), async (req, res) => {
   const { classId, scholarshipRequested, scholarshipType, scholarshipReason } = req.body;
   const studentId = req.user.id;
