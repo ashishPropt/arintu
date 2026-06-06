@@ -34,19 +34,21 @@ router.get('/', authenticate, async (req, res) => {
         WHERE c.is_active = TRUE ${enrolledFilter} ${search ? `AND c.name ILIKE $2` : ''}`;
       countParams = search ? [userId, `%${search}%`] : [userId];
     } else if (role === 'teacher') {
+      // Teacher sees classes where they appear in teacher_assignments OR class_schedules
+      const teacherFilter = `
+        (EXISTS (SELECT 1 FROM teacher_assignments ta WHERE ta.class_id = c.id AND ta.teacher_id = $1)
+         OR EXISTS (SELECT 1 FROM class_schedules  cs WHERE cs.class_id = c.id AND cs.teacher_id = $1))`;
       query = `
         SELECT c.*, u.name as admin_name,
                (SELECT COUNT(*) FROM enrollments e WHERE e.class_id = c.id) as enrolled_count
         FROM classes c
         JOIN users u ON u.id = c.admin_id
-        JOIN teacher_assignments ta ON ta.class_id = c.id AND ta.teacher_id = $1
-        WHERE c.is_active = TRUE ${search ? `AND c.name ILIKE $2` : ''}
+        WHERE c.is_active = TRUE AND ${teacherFilter} ${search ? `AND c.name ILIKE $2` : ''}
         ORDER BY c.created_at DESC LIMIT ${search ? '$3' : '$2'} OFFSET ${search ? '$4' : '$3'}`;
       params = search ? [userId, `%${search}%`, limit, offset] : [userId, limit, offset];
       countQuery = `
         SELECT COUNT(*) FROM classes c
-        JOIN teacher_assignments ta ON ta.class_id = c.id AND ta.teacher_id = $1
-        WHERE c.is_active = TRUE ${search ? `AND c.name ILIKE $2` : ''}`;
+        WHERE c.is_active = TRUE AND ${teacherFilter} ${search ? `AND c.name ILIKE $2` : ''}`;
       countParams = search ? [userId, `%${search}%`] : [userId];
     } else if (role === 'admin') {
       // Admins see all classes (single-org setup)
