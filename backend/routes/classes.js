@@ -154,15 +154,19 @@ router.post(
 
 // GET /api/classes/:id
 router.get('/:id', authenticate, async (req, res) => {
+  const classId = req.params.id;
+
   const result = await db.query(
     `SELECT c.*, u.name as admin_name,
             (SELECT COUNT(*) FROM enrollments e WHERE e.class_id = c.id) as enrolled_count,
-            (SELECT json_agg(json_build_object('id', t.id, 'name', t.name, 'email', t.email))
-             FROM teacher_assignments ta JOIN users t ON t.id = ta.teacher_id
-             WHERE ta.class_id = c.id) as teachers
+            (SELECT json_agg(DISTINCT json_build_object('id', t.id, 'name', t.name, 'email', t.email))
+             FROM (SELECT DISTINCT teacher_id FROM class_schedules WHERE class_id = c.id AND teacher_id IS NOT NULL
+                   UNION
+                   SELECT teacher_id FROM teacher_assignments WHERE class_id = c.id) ta
+             JOIN users t ON t.id = ta.teacher_id) as teachers
      FROM classes c JOIN users u ON u.id = c.admin_id
      WHERE c.id = $1`,
-    [req.params.id]
+    [classId]
   );
   if (!result.rows[0]) return res.status(404).json({ error: 'Class not found' });
 
@@ -172,7 +176,7 @@ router.get('/:id', authenticate, async (req, res) => {
      FROM class_prerequisites cp
      JOIN classes c ON c.id = cp.prerequisite_class_id
      WHERE cp.class_id = $1 ORDER BY c.name ASC`,
-    [req.params.id]
+    [classId]
   );
 
   // Pricing
@@ -181,10 +185,26 @@ router.get('/:id', authenticate, async (req, res) => {
      FROM class_pricing cp
      LEFT JOIN countries co ON co.id = cp.country_id
      WHERE cp.class_id = $1 ORDER BY cp.is_default DESC`,
-    [req.params.id]
+    [classId]
   );
 
-  res.json({ ...result.rows[0], prerequisites: prereqs.rows, pricing: pricing.rows });
+  // Schedule slots — distinct session times (one row per session_code)
+  const schedules = await db.query(
+    `SELECT DISTINCT ON (session_code)
+       session_code, day_of_week, start_time, end_time, u.name as teacher
+     FROM class_schedules cs
+     LEFT JOIN users u ON u.id = cs.teacher_id
+     WHERE cs.class_id = $1 AND cs.session_code IS NOT NULL
+     ORDER BY session_code, start_time`,
+    [classId]
+  );
+
+  res.json({
+    ...result.rows[0],
+    prerequisites: prereqs.rows,
+    pricing:       pricing.rows,
+    schedules:     schedules.rows,
+  });
 });
 
 // PUT /api/classes/:id

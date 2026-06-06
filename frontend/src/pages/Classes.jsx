@@ -3,6 +3,17 @@ import { classes as classesApi, schedules as schedulesApi, users, countries as c
 import { useAuth } from '../contexts/AuthContext';
 import Modal from '../components/Modal';
 
+const DAY_NAMES = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+function formatSlotTime(isoString) {
+  if (!isoString) return '';
+  const d = new Date(isoString);
+  const pstH = ((d.getUTCHours() - 8) + 24) % 24;
+  const ampm = pstH >= 12 ? 'PM' : 'AM';
+  const h12  = pstH % 12 || 12;
+  const mm   = d.getUTCMinutes() === 0 ? '' : `:${String(d.getUTCMinutes()).padStart(2,'0')}`;
+  return `${h12}${mm} ${ampm}`;
+}
+
 export default function Classes() {
   const { user } = useAuth();
   const [classList, setClassList] = useState([]);
@@ -294,6 +305,29 @@ function StudentClassModal({ classId, onClose }) {
         {/* Description */}
         {data.description && (
           <p className="text-sm text-gray-600 leading-relaxed">{data.description}</p>
+        )}
+
+        {/* Schedule */}
+        {data.schedules && data.schedules.length > 0 && (
+          <div className="bg-gray-50 border border-gray-100 rounded-xl p-4">
+            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Schedule</p>
+            <div className="space-y-1.5">
+              {data.schedules.map((s) => (
+                <div key={s.session_code} className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-sm">
+                  <span className="font-semibold text-brand-600 text-xs">{s.session_code}</span>
+                  <span className="text-gray-700">{DAY_NAMES[s.day_of_week]}s</span>
+                  <span className="text-gray-400 text-xs">·</span>
+                  <span className="text-gray-700">{formatSlotTime(s.start_time)}–{formatSlotTime(s.end_time)} PST</span>
+                  {s.teacher && (
+                    <>
+                      <span className="text-gray-300 text-xs">·</span>
+                      <span className="text-gray-500 text-xs">{s.teacher}</span>
+                    </>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
         )}
 
         {/* Three info blocks */}
