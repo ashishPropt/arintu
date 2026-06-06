@@ -152,15 +152,20 @@ router.post(
       .withMessage('A valid parent/guardian email is required for student accounts'),
   ],
   async (req, res) => {
-    // ID document is mandatory for all registrations
-    if (!req.file) {
+    const verifyViaParent =
+      req.body.verifyViaParent === true ||
+      req.body.verifyViaParent === 'true' ||
+      req.body.verifyViaParent === '1';
+
+    // Students may waive the ID requirement if they will be verified through
+    // a parent who already has a verified Arintu account.
+    if (!verifyViaParent && !req.file) {
       return res.status(400).json({ error: 'A government-issued ID document (JPG, PNG, or PDF) is required to register.' });
     }
 
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
-      // Clean up uploaded file on validation failure
-      try { fs.unlinkSync(req.file.path); } catch {}
+      try { if (req.file) fs.unlinkSync(req.file.path); } catch {}
       return res.status(400).json({ error: errors.array()[0].msg });
     }
 
@@ -172,8 +177,14 @@ router.post(
     const role = requestedRole;
 
     if (role === 'superadmin') {
-      try { fs.unlinkSync(req.file.path); } catch {}
+      try { if (req.file) fs.unlinkSync(req.file.path); } catch {}
       return res.status(400).json({ error: 'Invalid role' });
+    }
+
+    // verifyViaParent only applies to students
+    if (verifyViaParent && role !== 'student') {
+      try { if (req.file) fs.unlinkSync(req.file.path); } catch {}
+      return res.status(400).json({ error: 'Parent-based verification is only available for student accounts.' });
     }
 
     try {
@@ -185,10 +196,6 @@ router.post(
 
       const hash = await bcrypt.hash(password, 12);
 
-      // All roles start pending — account is activated only after ID is verified
-      const accountStatus = 'pending';
-      const isActive = false;
-
       let validatedParentId = null;
       if (parentId) {
         const parent = await db.query(
@@ -198,36 +205,80 @@ router.post(
         if (parent.rows[0]) validatedParentId = parentId;
       }
 
+      // ── Parent-based verification path ───────────────────────────────────
+      // If the student opted to verify via parent, look up the parent by
+      // email and make sure their ID was already approved by admin.
+      let idWaivedViaParent = false;
+      let initialVerificationStatus = 'pending';
+      let initialAccountStatus = 'pending';
+      let initialIsActive = false;
+
+      if (verifyViaParent) {
+        if (!parentEmail) {
+          return res.status(400).json({ error: 'Parent/guardian email is required for parent-based verification.' });
+        }
+        const parentRow = await db.query(
+          `SELECT id, verification_status FROM users WHERE LOWER(email) = LOWER($1) LIMIT 1`,
+          [parentEmail]
+        );
+        if (!parentRow.rows[0]) {
+          return res.status(400).json({
+            error: 'No Arintu account was found for the parent email you provided. The parent must register and have their ID approved before you can use parent-based verification.',
+            code: 'PARENT_NOT_REGISTERED',
+          });
+        }
+        if (parentRow.rows[0].verification_status !== 'approved') {
+          return res.status(400).json({
+            error: "Your parent's ID has not been verified yet. Please wait until your parent's ID is approved, or upload your own government-issued ID instead.",
+            code: 'PARENT_NOT_VERIFIED',
+          });
+        }
+        validatedParentId         = parentRow.rows[0].id;
+        idWaivedViaParent         = true;
+        initialVerificationStatus = 'approved';
+        initialAccountStatus      = 'active';
+        initialIsActive           = true;
+      }
+
       const result = await db.query(
         `INSERT INTO users (name, email, password_hash, role, is_active, account_status, parent_id,
                             parent_name, parent_email, parent_phone, contact_preference, country_id,
-                            id_document_path, id_document_uploaded_at, verification_status)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, NOW(), 'pending')
+                            id_document_path, id_document_uploaded_at, verification_status,
+                            id_waived_via_parent)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
          RETURNING id, email, name, role, account_status`,
-        [name, emailAddr, hash, role, isActive, accountStatus, validatedParentId,
+        [name, emailAddr, hash, role, initialIsActive, initialAccountStatus, validatedParentId,
          role === 'student' ? (parentName || null) : null,
          role === 'student' ? (parentEmail || null) : null,
          role === 'student' ? (parentPhone || null) : null,
          contactPreference || 'email',
          countryId || null,
-         req.file.path]
+         req.file ? req.file.path : null,
+         req.file ? new Date() : null,
+         initialVerificationStatus,
+         idWaivedViaParent]
       );
       const user = result.rows[0];
 
-      // Rename the file to include the real user ID for traceability
-      const ext     = path.extname(req.file.path).toLowerCase();
-      const newPath = path.join(ID_UPLOAD_DIR, `${user.id}_${Date.now()}${ext}`);
-      try {
-        fs.renameSync(req.file.path, newPath);
-        await db.query('UPDATE users SET id_document_path = $1 WHERE id = $2', [newPath, user.id]);
-      } catch { /* non-fatal — old temp path still works */ }
+      // Rename the uploaded file to include the real user ID (only if a file was provided)
+      if (req.file) {
+        const ext     = path.extname(req.file.path).toLowerCase();
+        const newPath = path.join(ID_UPLOAD_DIR, `${user.id}_${Date.now()}${ext}`);
+        try {
+          fs.renameSync(req.file.path, newPath);
+          await db.query('UPDATE users SET id_document_path = $1 WHERE id = $2', [newPath, user.id]);
+        } catch { /* non-fatal — old temp path still works */ }
+      }
 
       return res.status(201).json({
-        pending: true,
-        message: 'Your account has been created. Your ID is being reviewed — you will be notified by email once approved.',
+        pending: !verifyViaParent,
+        viaParent: verifyViaParent,
+        message: verifyViaParent
+          ? "Your account has been created and verified through your parent's ID. You can sign in now and start applying for classes."
+          : 'Your account has been created. Your ID is being reviewed — you will be notified by email once approved.',
       });
     } catch (err) {
-      try { fs.unlinkSync(req.file.path); } catch {}
+      try { if (req.file) fs.unlinkSync(req.file.path); } catch {}
       console.error(err);
       res.status(500).json({ error: 'Server error' });
     }

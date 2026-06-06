@@ -29,6 +29,8 @@ export default function Register() {
   const [loading,    setLoading]    = useState(false);
   const [error,      setError]      = useState('');
   const [submitted,  setSubmitted]  = useState(false);
+  const [submittedViaParent, setSubmittedViaParent] = useState(false);
+  const [verifyViaParent,    setVerifyViaParent]    = useState(false);
   const fileRef = useRef(null);
 
   useEffect(() => {
@@ -45,17 +47,25 @@ export default function Register() {
       if (!form.parentName.trim()) return setError('Parent/guardian name is required');
       if (!form.parentEmail.trim()) return setError('Parent/guardian email is required');
     }
-    if (!idFile) return setError('Please upload a government-issued ID document to continue.');
+    const allowedViaParent = form.role === 'student' && verifyViaParent;
+    if (!allowedViaParent && !idFile) {
+      return setError('Please upload a government-issued ID document, or pick the parent-verification option.');
+    }
 
     setLoading(true);
     try {
-      // Use FormData so the ID file travels as multipart
       const fd = new FormData();
       Object.entries(form).forEach(([k, v]) => { if (v) fd.append(k, v); });
-      fd.append('id_document', idFile);
+      if (allowedViaParent) {
+        fd.append('verifyViaParent', 'true');
+      } else if (idFile) {
+        fd.append('id_document', idFile);
+      }
 
       const res = await authApi.register(fd);
-      if (res.data.pending) {
+      if (allowedViaParent) {
+        setSubmittedViaParent(true);
+      } else if (res.data.pending) {
         setSubmitted(true);
       }
     } catch (err) {
@@ -81,6 +91,25 @@ export default function Register() {
             </p>
             <p className="text-sm text-gray-400 mb-6">
               You can sign in to check your verification status at any time.
+            </p>
+            <Link to="/login" className="btn-primary w-full block text-center">Go to sign in</Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (submittedViaParent) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-brand-50 via-white to-accent-50 p-4">
+        <div className="w-full max-w-sm">
+          <div className="card p-8 text-center">
+            <div className="text-5xl mb-4">✅</div>
+            <h2 className="text-lg font-semibold text-gray-900 mb-2">
+              Account verified through your parent!
+            </h2>
+            <p className="text-sm text-gray-500 mb-6">
+              Your account is active. Sign in to start applying for classes.
             </p>
             <Link to="/login" className="btn-primary w-full block text-center">Go to sign in</Link>
           </div>
@@ -204,42 +233,78 @@ export default function Register() {
               </div>
             )}
 
-            {/* ID Document upload */}
-            <div className="border border-amber-100 rounded-xl p-4 bg-amber-50 space-y-2">
-              <div>
-                <p className="text-xs font-semibold text-amber-800 mb-0.5">
-                  🪪 Government-issued ID <span className="text-red-500">*</span>
-                </p>
-                <p className="text-xs text-amber-700 leading-snug">
-                  Upload a clear photo or scan of your passport, national ID, or driving licence.
-                  Your account will be activated once the document is verified (usually within 24 hours).
-                </p>
-              </div>
+            {/* Identity verification */}
+            <div className="border border-amber-100 rounded-xl p-4 bg-amber-50 space-y-3">
+              <p className="text-xs font-semibold text-amber-800">
+                🪪 Identity verification <span className="text-red-500">*</span>
+              </p>
 
-              <input
-                ref={fileRef}
-                type="file"
-                accept=".jpg,.jpeg,.png,.pdf"
-                className="hidden"
-                onChange={(e) => setIdFile(e.target.files?.[0] || null)}
-              />
-
-              {idFile ? (
-                <div className="flex items-center gap-2 p-2 bg-white border border-amber-200 rounded-lg">
-                  <span className="text-base">📄</span>
-                  <span className="text-xs text-gray-700 flex-1 truncate">{idFile.name}</span>
-                  <span className="text-xs text-gray-400">{(idFile.size / 1024).toFixed(0)} KB</span>
-                  <button type="button" onClick={() => { setIdFile(null); fileRef.current.value = ''; }}
-                    className="text-xs text-red-400 hover:text-red-600 ml-1">✕</button>
+              {isStudent && (
+                <div className="space-y-1.5">
+                  <label className={`flex items-start gap-2 p-2 rounded-lg border cursor-pointer text-xs ${!verifyViaParent ? 'border-amber-300 bg-white' : 'border-amber-100'}`}>
+                    <input
+                      type="radio"
+                      name="verifyMode"
+                      checked={!verifyViaParent}
+                      onChange={() => setVerifyViaParent(false)}
+                      className="mt-0.5"
+                    />
+                    <span>
+                      <strong className="text-amber-900">I have a government-issued ID</strong>
+                      <span className="block text-amber-700">Passport, national ID, or driving licence.</span>
+                    </span>
+                  </label>
+                  <label className={`flex items-start gap-2 p-2 rounded-lg border cursor-pointer text-xs ${verifyViaParent ? 'border-amber-300 bg-white' : 'border-amber-100'}`}>
+                    <input
+                      type="radio"
+                      name="verifyMode"
+                      checked={verifyViaParent}
+                      onChange={() => { setVerifyViaParent(true); setIdFile(null); }}
+                      className="mt-0.5"
+                    />
+                    <span>
+                      <strong className="text-amber-900">Verify through my parent</strong>
+                      <span className="block text-amber-700">
+                        Use this if you don't have a government-issued ID. Your parent must already have an Arintu account with their ID approved — we'll look them up by the email above.
+                      </span>
+                    </span>
+                  </label>
                 </div>
-              ) : (
-                <button
-                  type="button"
-                  onClick={() => fileRef.current.click()}
-                  className="w-full py-2 px-3 border-2 border-dashed border-amber-200 rounded-lg text-xs text-amber-700 hover:bg-amber-100 transition-colors"
-                >
-                  Click to choose file — JPG, PNG, or PDF, max 5 MB
-                </button>
+              )}
+
+              {(!isStudent || !verifyViaParent) && (
+                <>
+                  <p className="text-xs text-amber-700 leading-snug">
+                    Upload a clear photo or scan of your passport, national ID, or driving licence.
+                    Your account will be activated once the document is verified (usually within 24 hours).
+                  </p>
+
+                  <input
+                    ref={fileRef}
+                    type="file"
+                    accept=".jpg,.jpeg,.png,.pdf"
+                    className="hidden"
+                    onChange={(e) => setIdFile(e.target.files?.[0] || null)}
+                  />
+
+                  {idFile ? (
+                    <div className="flex items-center gap-2 p-2 bg-white border border-amber-200 rounded-lg">
+                      <span className="text-base">📄</span>
+                      <span className="text-xs text-gray-700 flex-1 truncate">{idFile.name}</span>
+                      <span className="text-xs text-gray-400">{(idFile.size / 1024).toFixed(0)} KB</span>
+                      <button type="button" onClick={() => { setIdFile(null); fileRef.current.value = ''; }}
+                        className="text-xs text-red-400 hover:text-red-600 ml-1">✕</button>
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => fileRef.current.click()}
+                      className="w-full py-2 px-3 border-2 border-dashed border-amber-200 rounded-lg text-xs text-amber-700 hover:bg-amber-100 transition-colors"
+                    >
+                      Click to choose file — JPG, PNG, or PDF, max 5 MB
+                    </button>
+                  )}
+                </>
               )}
             </div>
 
