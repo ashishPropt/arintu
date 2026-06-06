@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import { classes as classesApi, schedules as schedulesApi, users, countries as countriesApi, applications, publicApi } from '../api';
 import { useAuth } from '../contexts/AuthContext';
 import Modal from '../components/Modal';
+import SharedApplyModal from '../components/ApplyModal';
 
 const DAY_NAMES = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
 function formatSlotTime(isoString) {
@@ -16,6 +17,246 @@ function formatSlotTime(isoString) {
 
 export default function Classes() {
   const { user } = useAuth();
+
+  // Students get a public-style rich card view with apply buttons
+  if (user?.role === 'student') {
+    return <StudentClassesPage user={user} />;
+  }
+
+  return <AdminTeacherClassesPage user={user} />;
+}
+
+// ── New rich student view ─────────────────────────────────────────────────────
+function StudentClassesPage({ user }) {
+  const [classes, setClasses]       = useState([]);
+  const [myApps,  setMyApps]        = useState([]);
+  const [loading, setLoading]       = useState(true);
+  const [countries, setCountries]   = useState([]);
+  const [selectedCode, setSelectedCode] = useState('US');
+  const [applyTarget, setApplyTarget]   = useState(null);
+  const [detailTarget, setDetailTarget] = useState(null);
+
+  useEffect(() => {
+    countriesApi.list().then((r) => {
+      setCountries(r.data || []);
+      // Default to user's stored country if available
+      if (user?.country_code) setSelectedCode(user.country_code);
+    }).catch(() => {});
+  }, [user?.country_code]);
+
+  const load = useCallback(() => {
+    setLoading(true);
+    Promise.all([
+      publicApi.classes(selectedCode),
+      applications.list(),
+    ]).then(([cls, apps]) => {
+      setClasses(cls.data || []);
+      setMyApps(Array.isArray(apps.data) ? apps.data : []);
+    }).catch(() => {}).finally(() => setLoading(false));
+  }, [selectedCode]);
+
+  useEffect(() => { load(); }, [load]);
+
+  const appByClass = useMemo(() => {
+    const m = {};
+    for (const a of myApps) m[a.class_id] = a;
+    return m;
+  }, [myApps]);
+
+  const selectedCountry = countries.find((c) => c.code === selectedCode);
+
+  return (
+    <div>
+      <div className="flex flex-wrap items-end justify-between gap-3 mb-6">
+        <div>
+          <h1 className="text-xl font-bold text-gray-900">Classes</h1>
+          <p className="text-sm text-gray-500">{classes.length} available</p>
+        </div>
+        {countries.length > 0 && (
+          <div className="inline-flex items-center gap-2 bg-white border border-gray-200 rounded-xl px-3 py-1.5 shadow-sm">
+            <span className="text-xs text-gray-500">Prices for:</span>
+            <select
+              className="text-sm border-0 bg-transparent focus:outline-none font-medium text-gray-800"
+              value={selectedCode}
+              onChange={(e) => setSelectedCode(e.target.value)}
+            >
+              {countries.map((c) => (
+                <option key={c.code} value={c.code}>{c.name} ({c.currency_code})</option>
+              ))}
+            </select>
+          </div>
+        )}
+      </div>
+
+      {loading ? (
+        <div className="text-center py-16 text-gray-400">Loading classes…</div>
+      ) : classes.length === 0 ? (
+        <div className="text-center py-16 text-gray-400">No classes available yet. Check back soon!</div>
+      ) : (
+        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
+          {classes.map((c) => (
+            <StudentClassCard
+              key={c.id}
+              cls={c}
+              myApp={appByClass[c.id]}
+              selectedCountry={selectedCountry}
+              onApply={() => {
+                if (user?.fee_waiver_status === 'pending') {
+                  setApplyTarget({ ...c, _waiverBlocked: true });
+                } else {
+                  setApplyTarget(c);
+                }
+              }}
+              onView={() => setDetailTarget(c.id)}
+            />
+          ))}
+        </div>
+      )}
+
+      {applyTarget && (
+        <SharedApplyModal
+          cls={applyTarget}
+          countryCode={selectedCode}
+          country={selectedCountry}
+          onClose={() => setApplyTarget(null)}
+          onApplied={() => { setApplyTarget(null); load(); }}
+        />
+      )}
+
+      {detailTarget && (
+        <StudentClassModal
+          classId={detailTarget}
+          onClose={() => { setDetailTarget(null); load(); }}
+        />
+      )}
+    </div>
+  );
+}
+
+function StudentClassCard({ cls, myApp, selectedCountry, onApply, onView }) {
+  const [descExpanded, setDescExpanded] = useState(false);
+  const CHAR_LIMIT = 140;
+  const longDesc = cls.description && cls.description.length > CHAR_LIMIT;
+
+  const ps  = myApp?.payment_status;
+  const cfs = myApp?.class_fee_status;
+  const st  = myApp?.status;
+
+  const appFeeSettled = ['paid','waived','not_required'].includes(ps);
+  const isEnrolled    = st === 'approved' || ['paid','full_scholarship','not_required'].includes(cfs);
+  const isRejected    = st === 'rejected';
+  const isSchPending  = cfs === 'scholarship_pending';
+  const classFeeOwed  = myApp && appFeeSettled && cfs === 'pending_payment';
+  const appFeeOwed    = myApp && !appFeeSettled;
+
+  // Action button state
+  let action;
+  if (isEnrolled) {
+    action = { label: '✓ Enrolled — Open', cls: 'bg-green-50 border-green-200 text-green-700 hover:bg-green-100', onClick: onView };
+  } else if (classFeeOwed) {
+    action = { label: 'Pay Class Fee →', cls: 'bg-amber-50 border-amber-200 text-amber-700 hover:bg-amber-100', onClick: onView };
+  } else if (appFeeOwed) {
+    action = { label: 'Complete Payment →', cls: 'bg-amber-50 border-amber-200 text-amber-700 hover:bg-amber-100', onClick: onView };
+  } else if (isSchPending) {
+    action = { label: '⏳ Scholarship Pending', cls: 'bg-purple-50 border-purple-200 text-purple-700', onClick: onView };
+  } else if (isRejected) {
+    action = { label: 'Application Rejected', cls: 'bg-red-50 border-red-200 text-red-700', onClick: onView };
+  } else if (myApp) {
+    action = { label: 'View Application', cls: 'bg-gray-50 border-gray-200 text-gray-700 hover:bg-gray-100', onClick: onView };
+  } else {
+    action = { label: 'Apply Now', cls: 'btn-primary', onClick: onApply };
+  }
+
+  return (
+    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition-shadow overflow-hidden flex flex-col">
+      <div className="h-1.5 bg-gradient-to-r from-brand-500 to-accent-500" />
+
+      <div className="p-5 flex flex-col flex-1">
+        <div className="flex items-start justify-between mb-3">
+          <div className="text-right ml-auto">
+            {cls.price != null ? (
+              <div>
+                <span className="text-xl font-bold text-brand-600">
+                  {cls.currency_symbol || selectedCountry?.currency_symbol || ''}{Number(cls.price).toLocaleString()}
+                </span>
+                <span className="text-xs text-gray-400 ml-1">{cls.currency_code}</span>
+              </div>
+            ) : (
+              <span className="text-sm text-gray-400 italic">Price on request</span>
+            )}
+          </div>
+        </div>
+
+        {cls.code && (
+          <span className="inline-block text-xs font-bold tracking-wide text-brand-600 bg-brand-50 px-2 py-0.5 rounded-md mb-1 self-start">
+            {cls.code}
+          </span>
+        )}
+        <h3 className="font-semibold text-gray-900 text-base mb-1">{cls.name}</h3>
+        {cls.subject && (
+          <p className="text-xs text-gray-500 mb-1">
+            {cls.subject}{cls.level ? ` · ${cls.level}` : ''}
+          </p>
+        )}
+
+        {cls.description && (
+          <div className="mb-3">
+            <p className="text-xs text-gray-500 leading-relaxed">
+              {descExpanded || !longDesc
+                ? cls.description
+                : cls.description.slice(0, CHAR_LIMIT).trimEnd() + '…'}
+            </p>
+            {longDesc && (
+              <button
+                onClick={() => setDescExpanded((v) => !v)}
+                className="text-xs text-brand-600 hover:underline mt-0.5 font-medium"
+              >
+                {descExpanded ? 'See less' : 'See more'}
+              </button>
+            )}
+          </div>
+        )}
+
+        {cls.schedules && cls.schedules.length > 0 && (
+          <div className="mb-3 border-t border-gray-50 pt-3">
+            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">Schedule</p>
+            <div className="space-y-1">
+              {cls.schedules.map((s) => (
+                <div key={s.session_code} className="flex items-center gap-2 text-xs text-gray-600">
+                  <span className="font-medium text-brand-600 w-14 shrink-0">{s.session_code}</span>
+                  <span>{DAY_NAMES[s.day_of_week]}s</span>
+                  <span className="text-gray-400">·</span>
+                  <span>{formatSlotTime(s.start_time)}–{formatSlotTime(s.end_time)} PST</span>
+                  {s.teacher && (
+                    <>
+                      <span className="text-gray-300">·</span>
+                      <span className="text-gray-400">{s.teacher.split(' ').pop()}</span>
+                    </>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        <div className="mt-auto space-y-2">
+          <div className="flex items-center gap-3 text-xs text-gray-500">
+            <span>👤 {cls.enrolled_count || 0}/{cls.max_students} enrolled</span>
+            {cls.teachers?.[0] && <span>🎓 {cls.teachers[0].name}</span>}
+          </div>
+          <button
+            onClick={action.onClick}
+            className={`w-full text-sm py-2 px-3 rounded-lg border font-medium transition-colors ${action.cls}`}
+          >
+            {action.label}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function AdminTeacherClassesPage({ user }) {
   const [classList, setClassList] = useState([]);
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
@@ -26,7 +267,7 @@ export default function Classes() {
   const [regions, setRegions] = useState([]);
 
   const isAdmin   = ['admin', 'superadmin'].includes(user?.role);
-  const isStudent = user?.role === 'student';
+  const isStudent = false;
 
   const load = useCallback(async () => {
     setLoading(true);

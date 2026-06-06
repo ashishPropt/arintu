@@ -26,7 +26,7 @@ router.get('/classes', async (req, res) => {
       `SELECT c.id, c.name, c.code, c.description, c.subject, c.level, c.max_students, c.is_active,
               u.name as admin_name,
               (SELECT COUNT(*) FROM enrollments e WHERE e.class_id = c.id) as enrolled_count,
-              (SELECT json_agg(DISTINCT json_build_object('name', t.name))
+              (SELECT json_agg(json_build_object('name', t.name))
                FROM (SELECT DISTINCT teacher_id FROM class_schedules WHERE class_id = c.id AND teacher_id IS NOT NULL) cs
                JOIN users t ON t.id = cs.teacher_id) as teachers,
               (SELECT json_agg(slot ORDER BY slot->>'session_code')

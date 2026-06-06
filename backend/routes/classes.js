@@ -159,7 +159,7 @@ router.get('/:id', authenticate, async (req, res) => {
   const result = await db.query(
     `SELECT c.*, u.name as admin_name,
             (SELECT COUNT(*) FROM enrollments e WHERE e.class_id = c.id) as enrolled_count,
-            (SELECT json_agg(DISTINCT json_build_object('id', t.id, 'name', t.name, 'email', t.email))
+            (SELECT json_agg(json_build_object('id', t.id, 'name', t.name, 'email', t.email))
              FROM (SELECT DISTINCT teacher_id FROM class_schedules WHERE class_id = c.id AND teacher_id IS NOT NULL
                    UNION
                    SELECT teacher_id FROM teacher_assignments WHERE class_id = c.id) ta
