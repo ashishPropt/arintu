@@ -37,6 +37,10 @@ router.get('/classes', async (req, res) => {
                      'day_of_week',  cs2.day_of_week,
                      'start_time',   cs2.start_time,
                      'end_time',     cs2.end_time,
+                     'first_session_at', cs2.start_time,
+                     'last_session_at',
+                       (SELECT MAX(cs3.start_time) FROM class_schedules cs3
+                        WHERE cs3.class_id = c.id AND cs3.session_code = cs2.session_code),
                      'teacher',      tu.name,
                      'capacity',     c.max_students,
                      'enrolled_count',

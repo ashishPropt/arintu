@@ -13,6 +13,19 @@ function fmtTime(iso) {
   return `${h12}${mm} ${ampm}`;
 }
 
+function fmtPSTDate(iso) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  const pst = new Date(d.getTime() - 8 * 3600 * 1000);
+  return `${pst.getUTCMonth() + 1}/${pst.getUTCDate()}/${pst.getUTCFullYear()}`;
+}
+function fmtDateRange(firstIso, lastIso) {
+  if (!firstIso) return '';
+  const a = fmtPSTDate(firstIso);
+  const b = fmtPSTDate(lastIso);
+  return a === b || !lastIso ? a : `${a} – ${b}`;
+}
+
 function Row({ label, value }) {
   return (
     <div className="flex justify-between">
@@ -185,7 +198,7 @@ export default function ApplyModal({ cls, countryCode, country, onClose, onAppli
                       <div className="flex-1 min-w-0">
                         <div className="flex flex-wrap items-center gap-2">
                           <span className="font-semibold text-brand-600 text-xs">{s.session_code}</span>
-                          <span className="text-gray-800">{DAY_NAMES[s.day_of_week]}s</span>
+                          <span className="text-gray-800">{DAY_NAMES[s.day_of_week]}</span>
                           <span className="text-gray-400 text-xs">·</span>
                           <span className="text-gray-700">{fmtTime(s.start_time)}–{fmtTime(s.end_time)} PST</span>
                           {s.teacher && (
@@ -195,6 +208,12 @@ export default function ApplyModal({ cls, countryCode, country, onClose, onAppli
                             </>
                           )}
                         </div>
+                        {(() => {
+                          const dateRange = fmtDateRange(s.first_session_at || s.start_time, s.last_session_at);
+                          return dateRange ? (
+                            <p className="text-xs text-gray-500 mt-0.5">{dateRange}</p>
+                          ) : null;
+                        })()}
                         <p className="text-xs text-gray-400 mt-0.5">
                           {isFull
                             ? 'Full — pick another schedule'

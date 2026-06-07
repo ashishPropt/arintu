@@ -190,12 +190,16 @@ router.get('/:id', authenticate, async (req, res) => {
 
   // Schedule slots — distinct session times (one row per session_code)
   const schedules = await db.query(
-    `SELECT DISTINCT ON (session_code)
-       session_code, day_of_week, start_time, end_time, u.name as teacher
+    `SELECT DISTINCT ON (cs.session_code)
+       cs.session_code, cs.day_of_week, cs.start_time, cs.end_time,
+       cs.start_time AS first_session_at,
+       (SELECT MAX(cs2.start_time) FROM class_schedules cs2
+        WHERE cs2.class_id = cs.class_id AND cs2.session_code = cs.session_code) AS last_session_at,
+       u.name as teacher
      FROM class_schedules cs
      LEFT JOIN users u ON u.id = cs.teacher_id
      WHERE cs.class_id = $1 AND cs.session_code IS NOT NULL
-     ORDER BY session_code, start_time`,
+     ORDER BY cs.session_code, cs.start_time`,
     [classId]
   );
 

@@ -611,6 +611,21 @@ function formatSlotTime(isoString) {
   return `${h12}${mm} ${ampm}`;
 }
 
+function formatPSTDate(iso) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  // Shift to PST and read UTC fields for the PST calendar date
+  const pst = new Date(d.getTime() - 8 * 3600 * 1000);
+  return `${pst.getUTCMonth() + 1}/${pst.getUTCDate()}/${pst.getUTCFullYear()}`;
+}
+
+function formatDateRange(firstIso, lastIso) {
+  if (!firstIso) return '';
+  const a = formatPSTDate(firstIso);
+  const b = formatPSTDate(lastIso);
+  return a === b || !lastIso ? a : `${a} – ${b}`;
+}
+
 function ClassCard({ cls, selectedCountry, user, canApply, myApp, onApply }) {
   const teacher = cls.teachers?.[0];
   const [descExpanded, setDescExpanded] = useState(false);
@@ -674,11 +689,12 @@ function ClassCard({ cls, selectedCountry, user, canApply, myApp, onApply }) {
                 const enrolled = Number(s.enrolled_count) || 0;
                 const capacity = Number(s.capacity) || 0;
                 const isFull   = capacity > 0 && enrolled >= capacity;
+                const dateRange = formatDateRange(s.first_session_at || s.start_time, s.last_session_at);
                 return (
                   <div key={s.session_code} className="text-xs">
                     <div className="flex items-center gap-2 text-gray-600">
                       <span className="font-medium text-brand-600 w-14 shrink-0">{s.session_code}</span>
-                      <span>{DAY_NAMES[s.day_of_week]}s</span>
+                      <span>{DAY_NAMES[s.day_of_week]}</span>
                       <span className="text-gray-400">·</span>
                       <span>{formatSlotTime(s.start_time)}–{formatSlotTime(s.end_time)} PST</span>
                       {s.teacher && (
@@ -689,9 +705,11 @@ function ClassCard({ cls, selectedCountry, user, canApply, myApp, onApply }) {
                       )}
                     </div>
                     <div className="ml-16 text-[11px] text-gray-400">
+                      {dateRange && <span>{dateRange}</span>}
+                      {dateRange && <span className="mx-1.5">·</span>}
                       {isFull
                         ? <span className="text-red-500 font-medium">Full</span>
-                        : `${enrolled}/${capacity} enrolled`}
+                        : <span>{enrolled}/{capacity} enrolled</span>}
                     </div>
                   </div>
                 );

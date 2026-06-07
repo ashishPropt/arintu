@@ -14,6 +14,18 @@ function formatSlotTime(isoString) {
   const mm   = d.getUTCMinutes() === 0 ? '' : `:${String(d.getUTCMinutes()).padStart(2,'0')}`;
   return `${h12}${mm} ${ampm}`;
 }
+function formatPSTDate(iso) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  const pst = new Date(d.getTime() - 8 * 3600 * 1000);
+  return `${pst.getUTCMonth() + 1}/${pst.getUTCDate()}/${pst.getUTCFullYear()}`;
+}
+function formatDateRange(firstIso, lastIso) {
+  if (!firstIso) return '';
+  const a = formatPSTDate(firstIso);
+  const b = formatPSTDate(lastIso);
+  return a === b || !lastIso ? a : `${a} – ${b}`;
+}
 
 export default function Classes() {
   const { user } = useAuth();
@@ -225,11 +237,12 @@ function StudentClassCard({ cls, myApp, selectedCountry, onApply, onView }) {
                 const enrolled = Number(s.enrolled_count) || 0;
                 const capacity = Number(s.capacity) || 0;
                 const isFull   = capacity > 0 && enrolled >= capacity;
+                const dateRange = formatDateRange(s.first_session_at || s.start_time, s.last_session_at);
                 return (
                   <div key={s.session_code} className="text-xs">
                     <div className="flex items-center gap-2 text-gray-600">
                       <span className="font-medium text-brand-600 w-14 shrink-0">{s.session_code}</span>
-                      <span>{DAY_NAMES[s.day_of_week]}s</span>
+                      <span>{DAY_NAMES[s.day_of_week]}</span>
                       <span className="text-gray-400">·</span>
                       <span>{formatSlotTime(s.start_time)}–{formatSlotTime(s.end_time)} PST</span>
                       {s.teacher && (
@@ -240,6 +253,8 @@ function StudentClassCard({ cls, myApp, selectedCountry, onApply, onView }) {
                       )}
                     </div>
                     <div className="ml-16 text-[11px] text-gray-400">
+                      {dateRange && <span>{dateRange}</span>}
+                      {dateRange && <span className="mx-1.5">·</span>}
                       {isFull
                         ? <span className="text-red-500 font-medium">Full</span>
                         : `${enrolled}/${capacity} enrolled`}
@@ -564,20 +579,28 @@ function StudentClassModal({ classId, onClose }) {
           <div className="bg-gray-50 border border-gray-100 rounded-xl p-4">
             <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Schedule</p>
             <div className="space-y-1.5">
-              {data.schedules.map((s) => (
-                <div key={s.session_code} className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-sm">
-                  <span className="font-semibold text-brand-600 text-xs">{s.session_code}</span>
-                  <span className="text-gray-700">{DAY_NAMES[s.day_of_week]}s</span>
-                  <span className="text-gray-400 text-xs">·</span>
-                  <span className="text-gray-700">{formatSlotTime(s.start_time)}–{formatSlotTime(s.end_time)} PST</span>
-                  {s.teacher && (
-                    <>
-                      <span className="text-gray-300 text-xs">·</span>
-                      <span className="text-gray-500 text-xs">{s.teacher}</span>
-                    </>
-                  )}
-                </div>
-              ))}
+              {data.schedules.map((s) => {
+                const dateRange = formatDateRange(s.first_session_at || s.start_time, s.last_session_at);
+                return (
+                  <div key={s.session_code} className="text-sm">
+                    <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
+                      <span className="font-semibold text-brand-600 text-xs">{s.session_code}</span>
+                      <span className="text-gray-700">{DAY_NAMES[s.day_of_week]}</span>
+                      <span className="text-gray-400 text-xs">·</span>
+                      <span className="text-gray-700">{formatSlotTime(s.start_time)}–{formatSlotTime(s.end_time)} PST</span>
+                      {s.teacher && (
+                        <>
+                          <span className="text-gray-300 text-xs">·</span>
+                          <span className="text-gray-500 text-xs">{s.teacher}</span>
+                        </>
+                      )}
+                    </div>
+                    {dateRange && (
+                      <div className="text-xs text-gray-500 ml-12">{dateRange}</div>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           </div>
         )}
