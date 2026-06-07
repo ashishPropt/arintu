@@ -251,7 +251,7 @@ function ChildDashboard({ child }) {
   };
 
   return (
-    <div className="card overflow-hidden">
+    <div className="card overflow-x-auto">
       {/* Child header bar */}
       <button
         onClick={() => setExpanded((e) => !e)}

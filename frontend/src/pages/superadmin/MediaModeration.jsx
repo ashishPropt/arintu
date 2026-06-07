@@ -113,7 +113,7 @@ function MediaCard({ item, onPreview, onReview, onDelete }) {
   const fileUrl = galleryApi.fileUrl(item.id);
 
   return (
-    <div className="card overflow-hidden flex flex-col">
+    <div className="card overflow-x-auto flex flex-col">
       {/* Thumbnail */}
       <div className="relative bg-gray-100 cursor-pointer group" onClick={onPreview}>
         {item.file_type === 'photo' ? (

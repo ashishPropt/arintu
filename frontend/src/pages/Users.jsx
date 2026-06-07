@@ -64,7 +64,7 @@ export default function Users() {
       ) : userList.length === 0 ? (
         <div className="text-center py-12 text-gray-400">No users found</div>
       ) : (
-        <div className="card overflow-hidden">
+        <div className="card overflow-x-auto">
           <table className="w-full text-sm">
             <thead className="bg-gray-50 border-b border-gray-100">
               <tr>

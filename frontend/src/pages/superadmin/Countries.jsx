@@ -50,7 +50,7 @@ export default function Countries() {
           No countries yet. Click "+ Add Country" to get started.
         </div>
       ) : (
-        <div className="card overflow-hidden mb-4">
+        <div className="card overflow-x-auto mb-4">
           <table className="w-full text-sm">
             <thead className="bg-gray-50 border-b border-gray-100">
               <tr>

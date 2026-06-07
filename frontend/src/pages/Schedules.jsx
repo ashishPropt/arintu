@@ -144,7 +144,7 @@ export default function Schedules() {
         </div>
       </div>
 
-      <div className="card overflow-hidden">
+      <div className="card overflow-x-auto">
         <div className="grid grid-cols-7 border-b border-gray-100">
           {weekDays.map((day) => (
             <div key={day.toISOString()} className={`p-3 text-center border-r border-gray-50 last:border-r-0 ${isSameDay(day, new Date()) ? 'bg-brand-50' : ''}`}>

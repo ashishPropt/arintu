@@ -82,7 +82,7 @@ export default function Scholarships() {
       ) : list.length === 0 ? (
         <div className="text-center py-12 text-gray-400">No scholarship requests yet</div>
       ) : (
-        <div className="card overflow-hidden">
+        <div className="card overflow-x-auto">
           <table className="w-full text-sm">
             <thead className="bg-gray-50 border-b border-gray-100">
               <tr>
