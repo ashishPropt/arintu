@@ -706,10 +706,12 @@ function ClassCard({ cls, selectedCountry, user, canApply, myApp, onApply }) {
                     </div>
                     <div className="ml-16 text-[11px] text-gray-400">
                       {dateRange && <span>{dateRange}</span>}
-                      {dateRange && <span className="mx-1.5">·</span>}
-                      {isFull
-                        ? <span className="text-red-500 font-medium">Full</span>
-                        : <span>{enrolled}/{capacity} enrolled</span>}
+                      {isFull && (
+                        <>
+                          {dateRange && <span className="mx-1.5">·</span>}
+                          <span className="text-red-500 font-medium">Full</span>
+                        </>
+                      )}
                     </div>
                   </div>
                 );

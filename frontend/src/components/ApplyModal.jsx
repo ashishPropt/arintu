@@ -214,11 +214,11 @@ export default function ApplyModal({ cls, countryCode, country, onClose, onAppli
                             <p className="text-xs text-gray-500 mt-0.5">{dateRange}</p>
                           ) : null;
                         })()}
-                        <p className="text-xs text-gray-400 mt-0.5">
-                          {isFull
-                            ? 'Full — pick another schedule'
-                            : `${enrolled}/${capacity} enrolled · ${capacity - enrolled} ${capacity - enrolled === 1 ? 'spot' : 'spots'} left`}
-                        </p>
+                        {isFull && (
+                          <p className="text-xs text-red-500 font-medium mt-0.5">
+                            Full — pick another schedule
+                          </p>
+                        )}
                       </div>
                     </label>
                   );

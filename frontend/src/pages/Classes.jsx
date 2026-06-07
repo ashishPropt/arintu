@@ -254,10 +254,12 @@ function StudentClassCard({ cls, myApp, selectedCountry, onApply, onView }) {
                     </div>
                     <div className="ml-16 text-[11px] text-gray-400">
                       {dateRange && <span>{dateRange}</span>}
-                      {dateRange && <span className="mx-1.5">·</span>}
-                      {isFull
-                        ? <span className="text-red-500 font-medium">Full</span>
-                        : `${enrolled}/${capacity} enrolled`}
+                      {isFull && (
+                        <>
+                          {dateRange && <span className="mx-1.5">·</span>}
+                          <span className="text-red-500 font-medium">Full</span>
+                        </>
+                      )}
                     </div>
                   </div>
                 );
@@ -617,11 +619,10 @@ function StudentClassModal({ classId, onClose }) {
           </div>
 
           <div className={`p-4 rounded-xl border ${isFull ? 'bg-red-50 border-red-100' : 'bg-green-50 border-green-100'}`}>
-            <p className="text-xs text-gray-400 mb-1.5 font-medium uppercase tracking-wide">Spots</p>
+            <p className="text-xs text-gray-400 mb-1.5 font-medium uppercase tracking-wide">Availability</p>
             <p className={`text-sm font-semibold ${isFull ? 'text-red-700' : 'text-green-700'}`}>
-              {isFull ? 'Full' : `${spotsLeft} left`}
+              {isFull ? 'Full' : 'Open'}
             </p>
-            <p className="text-xs text-gray-500 mt-0.5">{enrolled} / {maxStudents} enrolled</p>
           </div>
 
           <div className="p-4 rounded-xl bg-brand-50 border border-brand-100">
