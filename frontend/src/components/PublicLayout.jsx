@@ -16,6 +16,9 @@ const communityLinks = [
   { to: '/community/book-club',          label: 'Book Club' },
   { to: '/community/arintu-online',      label: 'Arintu Online' },
   { to: '/community/enfinitty-circle',   label: 'Enfinitty Circle' },
+  { to: '/community/mathwave',           label: '🌊 Mathwave' },
+  { to: '/community/readwave',           label: '📖 Readwave' },
+  { to: '/community/writewave',          label: '✍️ Writewave' },
   { to: '/community/testimonials',       label: 'Testimonials' },
   { to: '/community/gallery',            label: '📷 Gallery' },
 ];

@@ -39,6 +39,9 @@ import FAQ from './pages/public/FAQ';
 import BookClub from './pages/public/BookClub';
 import ArintuOnline from './pages/public/ArintuOnline';
 import EnfinittyCircle from './pages/public/EnfinittyCircle';
+import Mathwave from './pages/public/Mathwave';
+import Readwave from './pages/public/Readwave';
+import Writewave from './pages/public/Writewave';
 import ContactUs from './pages/public/ContactUs';
 import Terms from './pages/public/Terms';
 import Privacy from './pages/public/Privacy';
@@ -98,6 +101,9 @@ export default function App() {
             <Route path="/community/book-club"        element={<BookClub />} />
             <Route path="/community/arintu-online"    element={<ArintuOnline />} />
             <Route path="/community/enfinitty-circle" element={<EnfinittyCircle />} />
+            <Route path="/community/mathwave"         element={<Mathwave />} />
+            <Route path="/community/readwave"         element={<Readwave />} />
+            <Route path="/community/writewave"        element={<Writewave />} />
             <Route path="/community/testimonials"     element={<Testimonials />} />
             <Route path="/community/gallery"          element={<Gallery />} />
             <Route path="/contact"         element={<ContactUs />} />
