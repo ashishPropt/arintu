@@ -4,6 +4,7 @@ import { publicApi, countries as countriesApi, applications } from '../api';
 import { useAuth } from '../contexts/AuthContext';
 import Modal from '../components/Modal';
 import ApplyModal from '../components/ApplyModal';
+import DiscountTimer from '../components/DiscountTimer';
 import axios from 'axios';
 
 // ── Stripe Checkout redirect ───────────────────────────────────────────────
@@ -657,6 +658,7 @@ function ClassCard({ cls, selectedCountry, user, canApply, myApp, onApply }) {
                     </span>
                   </div>
                 )}
+                <DiscountTimer />
               </div>
             ) : (
               <span className="text-sm text-gray-400 italic">Price on request</span>

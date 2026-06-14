@@ -3,6 +3,7 @@ import { classes as classesApi, schedules as schedulesApi, users, countries as c
 import { useAuth } from '../contexts/AuthContext';
 import Modal from '../components/Modal';
 import SharedApplyModal from '../components/ApplyModal';
+import DiscountTimer from '../components/DiscountTimer';
 
 const DAY_NAMES = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
 function formatSlotTime(isoString) {
@@ -204,6 +205,7 @@ function StudentClassCard({ cls, myApp, selectedCountry, onApply, onView }) {
                     </span>
                   </div>
                 )}
+                <DiscountTimer />
               </div>
             ) : (
               <span className="text-sm text-gray-400 italic">Price on request</span>
