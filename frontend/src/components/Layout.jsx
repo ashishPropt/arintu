@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Outlet } from 'react-router-dom';
 import Sidebar from './Sidebar';
 import NotificationBell from './NotificationBell';
+import DiscountBanner from './DiscountBanner';
 import { useAuth } from '../contexts/AuthContext';
 
 export default function Layout() {
@@ -32,6 +33,7 @@ export default function Layout() {
             </div>
           </div>
         </header>
+        <DiscountBanner />
         <main className="flex-1 p-4 sm:p-6 overflow-auto">
           <Outlet />
         </main>

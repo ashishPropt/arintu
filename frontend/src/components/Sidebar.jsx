@@ -19,6 +19,7 @@ const navByRole = {
     { to: '/app/manage-team',        label: 'Team Members',         icon: TeamIcon },
     { to: '/app/manage-jobs',        label: 'Job Postings',         icon: JobsIcon },
     { to: '/app/manage-blogs',       label: 'Blog Posts',           icon: BlogIcon },
+    { to: '/app/discount',           label: 'Discount Campaign',    icon: TagIcon },
     { to: '/app/site-content',      label: 'Site Content',         icon: EditIcon },
     { to: '/app/media-moderation',  label: 'Media Gallery',        icon: GalleryIcon },
   ],

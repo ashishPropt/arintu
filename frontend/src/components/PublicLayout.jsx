@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import { Link, Outlet, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import Logo from './Logo';
+import DiscountBanner from './DiscountBanner';
 
 const aboutLinks = [
   { to: '/about/team',    label: 'Team' },
@@ -72,6 +73,7 @@ export default function PublicLayout() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-brand-50 via-white to-accent-50">
+      <DiscountBanner />
       {/* Sticky header */}
       <header className="bg-white/90 backdrop-blur-sm border-b border-gray-100 sticky top-0 z-40">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between gap-4">

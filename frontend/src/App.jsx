@@ -52,6 +52,7 @@ import Gallery from './pages/public/Gallery';
 import Blog from './pages/public/Blog';
 import BlogPost from './pages/public/BlogPost';
 import ManageBlogs from './pages/superadmin/ManageBlogs';
+import DiscountAdmin from './pages/superadmin/Discount';
 
 function RequireAuth({ children, roles }) {
   const { user, loading } = useAuth();
@@ -183,6 +184,11 @@ export default function App() {
             <Route path="manage-blogs" element={
               <RequireAuth roles={['superadmin']}>
                 <ManageBlogs />
+              </RequireAuth>
+            } />
+            <Route path="discount" element={
+              <RequireAuth roles={['superadmin']}>
+                <DiscountAdmin />
               </RequireAuth>
             } />
             <Route path="family" element={

@@ -641,10 +641,22 @@ function ClassCard({ cls, selectedCountry, user, canApply, myApp, onApply }) {
           <div className="text-right">
             {cls.price != null ? (
               <div>
-                <span className="text-xl font-bold text-brand-600">
+                {cls.discount_active && cls.original_price != null && (
+                  <div className="text-xs text-gray-400 line-through">
+                    {cls.currency_symbol || selectedCountry?.currency_symbol || ''}{Number(cls.original_price).toLocaleString()}
+                  </div>
+                )}
+                <span className={`text-xl font-bold ${cls.discount_active ? 'text-red-600' : 'text-brand-600'}`}>
                   {cls.currency_symbol || selectedCountry?.currency_symbol || ''}{Number(cls.price).toLocaleString()}
                 </span>
                 <span className="text-xs text-gray-400 ml-1">{cls.currency_code}</span>
+                {cls.discount_active && (
+                  <div className="mt-0.5">
+                    <span className="inline-block text-[10px] font-bold tracking-wide text-white bg-red-500 px-1.5 py-0.5 rounded">
+                      {cls.discount_pct}% OFF
+                    </span>
+                  </div>
+                )}
               </div>
             ) : (
               <span className="text-sm text-gray-400 italic">Price on request</span>

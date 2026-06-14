@@ -6,6 +6,7 @@ const express = require('express');
 const path    = require('path');
 const fs      = require('fs');
 const db      = require('../database/db');
+const { readSettings: readDiscount } = require('./discount');
 
 const router = express.Router();
 
@@ -57,6 +58,9 @@ router.get('/classes', async (req, res) => {
        WHERE c.is_active = TRUE
        ORDER BY c.code ASC NULLS LAST, c.created_at DESC`
     );
+
+    // Look up any active discount once for this request
+    const discount = await readDiscount();
 
     // For each class, find the best price for the requested country.
     // Pricing strategy:
@@ -135,10 +139,23 @@ router.get('/classes', async (req, res) => {
           }
         }
 
+        // Apply active discount to the final localized price
+        let originalPrice = price;
+        let discountPct   = 0;
+        let discountedFlag = false;
+        if (discount.active && discount.pct > 0 && price != null) {
+          discountPct   = discount.pct;
+          discountedFlag = true;
+          price = Math.max(1, Math.round(Number(price) * (1 - discount.pct / 100)));
+        }
+
         return {
           ...cls,
           price,
-          currency_code: currencyCode,
+          original_price:  discountedFlag ? originalPrice : null,
+          discount_pct:    discountPct,
+          discount_active: discountedFlag,
+          currency_code:   currencyCode,
           currency_symbol: currencySymbol || (country?.currency_symbol),
           country: country ? { code: country.code, name: country.name } : null,
         };

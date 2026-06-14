@@ -243,6 +243,11 @@ export const recordings = {
   byClass: (classId) => api.get(`/recordings/class/${classId}`),
 };
 
+export const discount = {
+  get:    ()           => api.get('/discount'),
+  extend: (new_ends_at) => api.put('/discount/extend', { new_ends_at }),
+};
+
 export const blogs = {
   // Public
   list:     ()        => api.get('/blogs'),
